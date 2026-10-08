@@ -298,7 +298,6 @@ export function SaathiFace({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" className={`saathi-scene ${className}`}>
       <rect x="4" y="6" width="56" height="56" rx="18" fill="#c8352c" />
-      <rect x="4" y="40" width="56" height="7" fill="#f5e6c8" />
       <circle cx="32" cy="12" r="4" fill="#fff3b0" stroke="#8c1d17" strokeWidth="1" />
       <g className="saathi-eyes">
         <ellipse cx="21" cy="26" rx="8" ry="9.5" fill="#fff" stroke="#3a0f0c" strokeWidth="1.3" />
