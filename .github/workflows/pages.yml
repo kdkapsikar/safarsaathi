@@ -18,7 +18,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Nothing goes live unless the checks pass.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      # Scripts on: better-sqlite3 and argon2 need their native builds for the server tests.
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
   build:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

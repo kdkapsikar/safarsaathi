@@ -54,11 +54,12 @@ Differentiators:
 
 - No secrets in the repo. Provide `.env.example`. `.env`, `data/` and `reference/` are git-ignored.
 - `reference/old-project/` is **read-only** context from an earlier version (Bolt/Supabase/AWS). Use it only to review UI and requirements. Never copy its Supabase, DynamoDB, AWS Lambda or `.env` code.
-- Never push and never add a git remote until asked (Phase 8).
 
 ## Workflow
 
 - Work one phase at a time, as defined in `SafarSaathi-ClaudeCode-Prompts.md`. Plan first, then implement. **Don't build anything outside the current phase.**
 - `npm run dev` must start the API and web app with simulators and the offline assistant, using zero external accounts.
+- **Live target: GitHub Pages** (https://kdkapsikar.github.io/safarsaathi/, repo `kdkapsikar/safarsaathi`). Pushing to `main` runs `.github/workflows/pages.yml`: lint, typecheck and tests, then the in-browser demo build (`npm run build:pages -w web`) is deployed. Commit and push to `main` after each completed change, once checks pass.
+- Everything new must also work in the Pages demo: it runs the server's modules in the browser (`web/src/demo/`), so shared server code (data layer, trains, alerts, assistant tools, schemas) must stay free of Node-only APIs (fs, node:crypto, native modules, node-cron). Check with `npm run build:pages -w web` (no "externalized for browser compatibility" warnings) and add any new API route to `web/src/demo/backend.ts`.
 - Every phase ends with passing `npm run lint`, `npm run typecheck` and `npm test`. Then report the results and how to preview, and stop for the user's go-ahead before the next phase.
 - Log architecture decisions in `docs/decisions.md`.
