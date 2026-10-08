@@ -1,7 +1,7 @@
 /**
  * GitHub Pages demo: the API, running inside the browser.
  *
- * Pages can only serve static files, so in demo builds (VITE_DEMO=true) the web
+ * Pages can only serve static files, so in demo builds (`vite build --mode pages`) the web
  * app's requests to /api/... are answered here instead of by the Node server.
  * This reuses the server's own modules: the data-access layer and migrations
  * (on SQLite-in-WebAssembly), the simulator, the resilience layer, the alert

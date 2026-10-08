@@ -107,7 +107,7 @@ Newest last. Each entry: date, decision, reason.
 
 ## 2026-10-08: GitHub Pages demo
 
-- **The owner chose a Pages-only demo**, over Pages plus a separately hosted API, or one host for everything. Pages can't run Node, so a demo build (`vite build --mode pages`, `VITE_DEMO=true`) swaps the web app's HTTP transport for an in-browser backend (`web/src/demo/backend.ts`) that answers the same `/api/...` routes.
+- **The owner chose a Pages-only demo**, over Pages plus a separately hosted API, or one host for everything. Pages can't run Node, so a demo build (`vite build --mode pages`) swaps the web app's HTTP transport for an in-browser backend (`web/src/demo/backend.ts`) that answers the same `/api/...` routes.
 - **Server code is reused, not re-implemented.** The data-access layer, migrations, MockProvider, ResilientProvider, AlertEngine (event rules, idempotency) and OfflineAssistant tools run unchanged. SQLite is sql.js (WebAssembly) behind a small adapter with the better-sqlite3 API subset the DAL uses (`web/src/demo/sqlite.ts`), persisted to localStorage. To make that possible:
   - The engine no longer imports node-cron (`index.ts` schedules it).
   - Help topics come from a registered source (the server reads the file; the demo bundles it).

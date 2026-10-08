@@ -1,4 +1,4 @@
-# Publishes the in-browser demo (web/, built with VITE_DEMO=true) to GitHub Pages.
+# Publishes the in-browser demo (web/, built with `--mode pages`) to GitHub Pages.
 # Pages serves static files only, so the demo runs the API, simulator, alert
 # engine and offline assistant inside the visitor's browser (see web/src/demo/).
 name: Deploy demo to GitHub Pages

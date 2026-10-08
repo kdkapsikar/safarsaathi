@@ -134,8 +134,11 @@ export class ApiError extends Error {
   }
 }
 
-/** True in the GitHub Pages build, where the API runs inside the browser. */
-export const DEMO_MODE = import.meta.env.VITE_DEMO === 'true';
+/**
+ * True in the GitHub Pages build (`vite build --mode pages`), where the API
+ * runs inside the browser. VITE_DEMO=true also turns it on, e.g. for a local dev demo.
+ */
+export const DEMO_MODE = import.meta.env.MODE === 'pages' || import.meta.env.VITE_DEMO === 'true';
 
 /** fetch, or in demo builds the in-browser backend (loaded only there). */
 const transport = (input: string, init?: RequestInit): Promise<Response> =>
