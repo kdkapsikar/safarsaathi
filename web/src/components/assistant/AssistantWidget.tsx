@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
-import { SaathiFace, SaathiScene } from './SaathiScene';
+import { MiniSignal, SaathiFace, SaathiScene } from './SaathiScene';
 
 const SAMPLE_QUESTIONS = [
   'Is 12951 running late today?',
@@ -16,6 +16,8 @@ const SAMPLE_QUESTIONS = [
 export function AssistantWidget() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  // The launcher nudges for attention until Saathi has been opened once.
+  const [seen, setSeen] = useState(false);
   const panelId = useId();
   const titleId = useId();
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -128,21 +130,26 @@ export function AssistantWidget() {
       <button
         ref={launcherRef}
         type="button"
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => {
+          if (open) {
+            close();
+          } else {
+            setOpen(true);
+            setSeen(true);
+          }
+        }}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={open ? 'Close Saathi assistant' : 'Open Saathi assistant'}
-        className="saathi-launcher group relative grid size-16 place-items-center rounded-full bg-card shadow-lg ring-1 ring-line transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron"
+        className={`relative grid size-[4.75rem] place-items-center rounded-full bg-card shadow-lg ring-1 ring-line transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron ${
+          seen ? '' : 'saathi-launcher-nudge'
+        }`}
       >
-        <SaathiFace className="size-12" />
-        {!open && (
-          <span
-            aria-hidden="true"
-            className="absolute -top-1 -right-1 grid size-5 place-items-center rounded-full bg-saffron text-[10px] font-bold text-ink"
-          >
-            ?
-          </span>
+        {!seen && (
+          <span aria-hidden="true" className="saathi-launcher-ring absolute inset-0 rounded-full" />
         )}
+        <SaathiFace className="size-[3.75rem]" />
+        {!open && <MiniSignal className="absolute -top-2 -right-1 h-9 w-auto drop-shadow" />}
       </button>
     </div>
   );

@@ -321,7 +321,86 @@ body {
   }
 }
 
+/* Launcher: a mini signal cycling every 3s, plus a nudge and ripple until first opened. */
+.saathi-mini-red {
+  animation: saathi-mini-red 3s steps(1, end) infinite;
+}
+.saathi-mini-yellow {
+  animation: saathi-mini-yellow 3s steps(1, end) infinite;
+}
+.saathi-mini-green {
+  animation: saathi-mini-green 3s steps(1, end) infinite;
+}
+@keyframes saathi-mini-red {
+  0% {
+    opacity: 1;
+  }
+  33.33% {
+    opacity: 0.2;
+  }
+}
+@keyframes saathi-mini-yellow {
+  0% {
+    opacity: 0.2;
+  }
+  33.33% {
+    opacity: 1;
+  }
+  66.66% {
+    opacity: 0.2;
+  }
+}
+@keyframes saathi-mini-green {
+  0% {
+    opacity: 0.2;
+  }
+  66.66% {
+    opacity: 1;
+  }
+}
+.saathi-launcher-nudge {
+  animation: saathi-nudge 6s ease-in-out infinite;
+}
+.saathi-launcher-ring {
+  border: 3px solid var(--color-saffron);
+  animation: saathi-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes saathi-nudge {
+  0%,
+  82%,
+  100% {
+    transform: rotate(0) translateY(0);
+  }
+  86% {
+    transform: rotate(-8deg) translateY(-3px);
+  }
+  90% {
+    transform: rotate(7deg) translateY(-3px);
+  }
+  94% {
+    transform: rotate(-4deg) translateY(0);
+  }
+}
+@keyframes saathi-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .saathi-launcher-nudge,
+  .saathi-launcher-ring {
+    animation: none !important;
+  }
+  .saathi-launcher-ring {
+    opacity: 0;
+  }
   .saathi-scene,
   .saathi-scene * {
     animation: none !important;

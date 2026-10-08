@@ -51,9 +51,6 @@ export function SaathiScene({ className = '' }: { className?: string }) {
 
       {/* Overhead wire (Saathi is electric) */}
       <line x1="0" y1="64" x2="360" y2="64" stroke="#3b4a48" strokeWidth="1.2" />
-      <line x1="96" y1="58" x2="96" y2="64" stroke="#3b4a48" strokeWidth="1" />
-      <line x1="300" y1="58" x2="300" y2="64" stroke="#3b4a48" strokeWidth="1" />
-      <line x1="0" y1="58" x2="360" y2="58" stroke="#3b4a48" strokeWidth="0.8" opacity="0.6" />
 
       {/* Ground, ballast, sleepers, rail with a travelling glint */}
       <rect y="168" width="360" height="32" fill="#c9b99a" />
@@ -277,9 +274,21 @@ export function SaathiScene({ className = '' }: { className?: string }) {
           strokeWidth="1.2"
         />
         <text x="156" y="34" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f3d3e">
-          Namaste! 🙏
+          Namaste!
         </text>
       </g>
+    </svg>
+  );
+}
+
+/** A tiny railway signal that cycles red, yellow, green, to invite a click. */
+export function MiniSignal({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 34" aria-hidden="true" className={`saathi-scene ${className}`}>
+      <rect x="0.5" y="0.5" width="13" height="33" rx="6.5" fill="#1f2a29" stroke="#fff" />
+      <circle className="saathi-mini-red" cx="7" cy="8" r="3.6" fill="#ff4b3e" />
+      <circle className="saathi-mini-yellow" cx="7" cy="17" r="3.6" fill="#ffc83d" />
+      <circle className="saathi-mini-green" cx="7" cy="26" r="3.6" fill="#3ee08a" />
     </svg>
   );
 }
