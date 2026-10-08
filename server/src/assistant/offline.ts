@@ -155,9 +155,84 @@ async function answer(message: string, ctx: ToolContext, call: Call): Promise<st
       : `${out.result['summary']}. Press Confirm on the card to save it.`;
   }
 
-  // "When should I leave?" isn't built yet.
-  if (has(p.lower, 'leave', 'when should i go')) {
-    return '"When should I leave?" timing is coming soon. For now I can tell you how late your train is running, so ask me about your train number.';
+  // Why did an alert arrive?
+  if (
+    /\bwhy\b/.test(p.lower) &&
+    has(p.lower, 'alert', 'alerts', 'notification', 'notified', 'message', 'get', 'got')
+  ) {
+    if (!signedIn) return 'Sign in and I can explain the alerts you received.';
+    const out = await call('list_my_alerts', { limit: 10 });
+    const alerts = out.result['alerts'] as {
+      title: string;
+      why: string;
+      sent_at: string;
+      train_number: string | null;
+    }[];
+    const pick = alerts.find((a) => !p.train || a.train_number === p.train);
+    return pick
+      ? `"${pick.title}" (sent ${pick.sent_at}): ${pick.why}`
+      : "You haven't received any alerts yet.";
+  }
+
+  // When to leave home.
+  if (has(p.lower, 'leave', 'when should i go', 'start from home')) {
+    const minutes = Number(p.lower.match(/(\d{1,3})\s*(?:min|mins|minutes)\b/)?.[1] ?? NaN);
+    const travel = Number.isNaN(minutes) ? undefined : minutes;
+    let input: Record<string, unknown> | null = null;
+    if (signedIn) {
+      const js = (await call('list_my_journeys', {})).result['journeys'] as {
+        journey_id: string;
+        train_number: string;
+        boarding_date: string;
+      }[];
+      const j =
+        js.find((x) => x.train_number === p.train) ??
+        (!p.train
+          ? [...js]
+              .filter((x) => x.boarding_date >= istDate(ctx.now, -1))
+              .sort((a, b) => a.boarding_date.localeCompare(b.boarding_date))[0]
+          : undefined);
+      if (j)
+        input = {
+          journey_id: j.journey_id,
+          ...(travel !== undefined ? { travel_minutes: travel } : {}),
+        };
+    }
+    if (!input && p.train && p.codes[0] && travel !== undefined) {
+      input = {
+        train_number: p.train,
+        station_code: p.codes[0],
+        date: p.date,
+        travel_minutes: travel,
+      };
+    }
+    if (!input) {
+      return 'Tell me your train, boarding station and how long it takes you to get there, e.g. "When should I leave for 12951 at MMCT? It takes 40 minutes."';
+    }
+    const out = await call('get_leave_time', input);
+    if (out.isError) {
+      if (out.result['needs_travel_time'])
+        return "How many minutes does it take you to get to the station? You can also save it in the journey's settings.";
+      return out.result['not_found']
+        ? "I don't have live data for that train."
+        : unavailableText(out);
+    }
+    const r = out.result;
+    const sim = String(r['data_source'] ?? '').startsWith('simulator') ? ' (simulated data)' : '';
+    if (r['state'] !== 'OK') {
+      return r['state'] === 'DEPARTED'
+        ? `${r['train_number']} has already left ${r['station_code']}. As of ${r['as_of']}${sim}.`
+        : r['state'] === 'CANCELLED'
+          ? `${r['train_number']} is cancelled, so there's no need to leave. As of ${r['as_of']}${sim}.`
+          : `I can't work out a leave time for ${r['train_number']} at ${r['station_code']}.`;
+    }
+    const until = r['minutes_until_leave'] as number;
+    const when = until <= 0 ? 'Leave now' : `Leave by ${r['leave_by']}`;
+    const delay =
+      (r['delay_minutes'] as number) > 0
+        ? ` (${formatDelay(r['delay_minutes'] as number)}; scheduled ${r['scheduled_departure']})`
+        : '';
+    return `${when}. ${r['train_number']} is expected to depart ${r['station_code']} at ${r['expected_departure']}${delay}; that allows ${r['travel_minutes']} min to get there plus ${r['buffer_minutes']} min to spare. As of ${r['as_of']}${sim}.`;
   }
 
   // Trains between two stations.

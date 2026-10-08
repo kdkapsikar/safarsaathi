@@ -65,3 +65,32 @@ export const addRecipientSchema = z.object({
 });
 
 export type AddRecipientInput = z.infer<typeof addRecipientSchema>;
+
+const nullableMinutes = (max: number) => z.number().int().min(0).max(max).nullable();
+
+/** Per-journey smart rules, "leave now" and connection settings. */
+export const journeySettingsSchema = z
+  .object({
+    /** Delay alerts start at this many minutes (null = default 15). */
+    minDelayMinutes: nullableMinutes(1440),
+    /** Quiet hours (IST), both or neither. Non-urgent alerts wait until they end. */
+    quietHoursStart: hhmm.nullable(),
+    quietHoursEnd: hhmm.nullable(),
+    /** Door-to-station travel time; null turns "leave now" off. */
+    travelTimeMinutes: nullableMinutes(600),
+    leaveBufferMinutes: z.number().int().min(0).max(180),
+    /** Another of the user's journeys this one connects to. */
+    connectsToJourneyId: z.uuid().nullable(),
+    /** Minimum time needed to change trains. */
+    connectionBufferMinutes: z.number().int().min(0).max(240),
+  })
+  .refine((s) => (s.quietHoursStart === null) === (s.quietHoursEnd === null), {
+    message: 'Set both quiet-hours times or neither',
+    path: ['quietHoursEnd'],
+  })
+  .refine((s) => s.quietHoursStart === null || s.quietHoursStart !== s.quietHoursEnd, {
+    message: 'Quiet hours must start and end at different times',
+    path: ['quietHoursEnd'],
+  });
+
+export type JourneySettings = z.infer<typeof journeySettingsSchema>;

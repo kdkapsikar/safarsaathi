@@ -8,7 +8,12 @@
  * engine and the offline Saathi. Data lives in this browser only. Auth here is
  * for demonstration, not security: anyone with the browser can read it.
  */
-import { createDataAccess, EmailTakenError, type User } from '@safar-saathi/server/data/index';
+import {
+  createDataAccess,
+  DuplicateRecipientError,
+  EmailTakenError,
+  type User,
+} from '@safar-saathi/server/data/index';
 import { createEngineStore } from '@safar-saathi/server/data/engineStore';
 import { DEMO_ACCOUNT, demoJourneys } from '@safar-saathi/server/db/demoAccount';
 import { AlertEngine } from '@safar-saathi/server/alerts/engine';
@@ -26,9 +31,11 @@ import { ResilientProvider } from '@safar-saathi/server/trains/resilient';
 import { ProviderError, resolveStartDate } from '@safar-saathi/server/trains/index';
 import { validationError } from '@safar-saathi/server/routes/errors';
 import {
+  addRecipientSchema,
   createJourneySchema,
   istDate,
   journeyDateProblem,
+  journeySettingsSchema,
   loginSchema,
   registerSchema,
 } from '@safar-saathi/server/schemas';
@@ -99,6 +106,7 @@ async function createBackend() {
     inApp: new InAppChannel(store),
     email: new DryRunEmailChannel(silentLog),
     log: silentLog,
+    appUrl: `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}`,
   });
   const offline = new OfflineAssistant();
   let sessionUserId = readSession();
@@ -279,6 +287,92 @@ async function createBackend() {
       return mine.journeys.delete(m[1]!)
         ? noContent()
         : error(404, 'NOT_FOUND', 'Journey not found.');
+    }
+
+    // Journey settings, recipients, invite link
+    if ((m = path.match(/^\/api\/journeys\/([\w-]+)\/settings$/)) && method === 'PUT') {
+      if (!mine) return needUser();
+      const parsed = journeySettingsSchema.safeParse(body);
+      if (!parsed.success) return json(validationError(parsed.error), 400);
+      const result = mine.journeys.updateSettings(m[1]!, parsed.data);
+      if (result === 'NOT_FOUND') return error(404, 'NOT_FOUND', 'Journey not found.');
+      if (result === 'BAD_CONNECTION') {
+        return json(
+          {
+            error: {
+              code: 'VALIDATION',
+              message: 'Please check the highlighted fields.',
+              fields: { connectsToJourneyId: 'Choose another of your journeys' },
+            },
+          },
+          400,
+        );
+      }
+      void runAlerts();
+      return json({ journey: result });
+    }
+    if ((m = path.match(/^\/api\/journeys\/([\w-]+)\/recipients$/))) {
+      if (!mine) return needUser();
+      if (method === 'GET') {
+        const list = mine.recipients.listForJourney(m[1]!);
+        return list ? json({ recipients: list }) : error(404, 'NOT_FOUND', 'Journey not found.');
+      }
+      const parsed = addRecipientSchema.safeParse(body);
+      if (!parsed.success) return json(validationError(parsed.error), 400);
+      try {
+        const recipient = mine.recipients.add(m[1]!, parsed.data);
+        return recipient ? json({ recipient }, 201) : error(404, 'NOT_FOUND', 'Journey not found.');
+      } catch (err) {
+        if (err instanceof DuplicateRecipientError) {
+          return json(
+            { error: { code: 'DUPLICATE', message: err.message, fields: { email: err.message } } },
+            409,
+          );
+        }
+        throw err;
+      }
+    }
+    if (
+      (m = path.match(/^\/api\/journeys\/([\w-]+)\/recipients\/([\w-]+)$/)) &&
+      method === 'DELETE'
+    ) {
+      if (!mine) return needUser();
+      const ok =
+        mine.recipients.listForJourney(m[1]!)?.some((r) => r.id === m![2]) &&
+        mine.recipients.remove(m[2]!);
+      return ok ? noContent() : error(404, 'NOT_FOUND', 'Recipient not found.');
+    }
+    if ((m = path.match(/^\/api\/journeys\/([\w-]+)\/invite$/))) {
+      if (!mine) return needUser();
+      const result = mine.journeys.setInvite(m[1]!, method === 'POST');
+      if (!result) return error(404, 'NOT_FOUND', 'Journey not found.');
+      return method === 'POST' ? json(result) : noContent();
+    }
+
+    // Public links (no sign-in)
+    const gone = () =>
+      error(404, 'NOT_FOUND', 'This link is no longer valid. Ask the traveller for a new one.');
+    if ((m = path.match(/^\/api\/invites\/([\w-]+)$/))) {
+      if (method === 'GET') {
+        const invite = data.publicLinks.inviteInfo(m[1]!);
+        return invite ? json({ invite }) : gone();
+      }
+      const parsed = addRecipientSchema.safeParse(body);
+      if (!parsed.success) return json(validationError(parsed.error), 400);
+      try {
+        return data.publicLinks.join(m[1]!, parsed.data) ? json({ joined: true }, 201) : gone();
+      } catch (err) {
+        if (err instanceof DuplicateRecipientError)
+          return error(409, 'DUPLICATE', "You're already getting alerts for this journey.");
+        throw err;
+      }
+    }
+    if ((m = path.match(/^\/api\/opt-out\/([\w-]+)$/))) {
+      if (method === 'GET') {
+        const optOut = data.publicLinks.optOutInfo(m[1]!);
+        return optOut ? json({ optOut }) : gone();
+      }
+      return data.publicLinks.optOut(m[1]!) ? json({ optedOut: true }) : gone();
     }
 
     // Train data

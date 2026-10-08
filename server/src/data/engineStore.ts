@@ -22,6 +22,15 @@ export interface EngineJourney {
   toStationCode: string;
   journeyDate: string;
   rules: EngineRule[];
+  travelTimeMinutes: number | null;
+  leaveBufferMinutes: number;
+  connectsTo: {
+    journeyId: string;
+    trainNumber: string;
+    fromStationCode: string;
+    journeyDate: string;
+  } | null;
+  connectionBufferMinutes: number;
 }
 
 interface RuleRow {
@@ -37,6 +46,7 @@ export interface EngineRecipient {
   id: string;
   name: string;
   email: string;
+  optOutToken: string;
 }
 
 /**
@@ -52,22 +62,37 @@ export function createEngineStore(db: Db) {
       const rows = db
         .prepare(
           `SELECT j.id, j.user_id, u.name AS owner_name, u.email AS owner_email, j.train_number,
-                  j.from_station_code, j.to_station_code, j.journey_date
+                  j.from_station_code, j.to_station_code, j.journey_date,
+                  j.travel_time_minutes, j.leave_buffer_minutes, j.connection_buffer_minutes,
+                  c.id AS c_id, c.train_number AS c_train, c.from_station_code AS c_from, c.journey_date AS c_date
            FROM journeys j JOIN users u ON u.id = j.user_id
+           LEFT JOIN journeys c ON c.id = j.connects_to_journey_id AND c.user_id = j.user_id
            WHERE j.status = 'ACTIVE' AND j.journey_date BETWEEN ? AND ?`,
         )
-        .all(fromDate, toDate) as Record<string, string>[];
+        .all(fromDate, toDate) as Record<string, string | number | null>[];
       const rulesFor = db.prepare('SELECT * FROM alert_rules WHERE journey_id = ?');
+      const str = (v: unknown) => v as string;
       return rows.map((r) => ({
-        id: r.id!,
-        userId: r.user_id!,
-        ownerName: r.owner_name!,
-        ownerEmail: r.owner_email!,
-        trainNumber: r.train_number!,
-        fromStationCode: r.from_station_code!,
-        toStationCode: r.to_station_code!,
-        journeyDate: r.journey_date!,
-        rules: (rulesFor.all(r.id) as RuleRow[]).map((x) => ({
+        id: str(r['id']),
+        userId: str(r['user_id']),
+        ownerName: str(r['owner_name']),
+        ownerEmail: str(r['owner_email']),
+        trainNumber: str(r['train_number']),
+        fromStationCode: str(r['from_station_code']),
+        toStationCode: str(r['to_station_code']),
+        journeyDate: str(r['journey_date']),
+        travelTimeMinutes: (r['travel_time_minutes'] as number | null) ?? null,
+        leaveBufferMinutes: (r['leave_buffer_minutes'] as number | null) ?? 15,
+        connectionBufferMinutes: (r['connection_buffer_minutes'] as number | null) ?? 30,
+        connectsTo: r['c_id']
+          ? {
+              journeyId: str(r['c_id']),
+              trainNumber: str(r['c_train']),
+              fromStationCode: str(r['c_from']),
+              journeyDate: str(r['c_date']),
+            }
+          : null,
+        rules: (rulesFor.all(r['id']) as RuleRow[]).map((x) => ({
           id: x.id,
           type: x.type,
           minDelayMinutes: x.min_delay_minutes,
@@ -81,7 +106,8 @@ export function createEngineStore(db: Db) {
     activeRecipients(journeyId: string): EngineRecipient[] {
       return db
         .prepare(
-          'SELECT id, name, email FROM recipients WHERE journey_id = ? AND opted_out_at IS NULL',
+          `SELECT id, name, email, opt_out_token AS optOutToken FROM recipients
+           WHERE journey_id = ? AND opted_out_at IS NULL`,
         )
         .all(journeyId) as EngineRecipient[];
     },

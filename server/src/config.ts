@@ -60,6 +60,8 @@ const envSchema = z.object({
   ALERT_ENGINE_CRON: z.string().default('* * * * *'),
   /** Email delivery. Only 'dry-run' (log what would be sent) exists so far; 'off' disables email. */
   EMAIL_MODE: z.enum(['dry-run', 'off']).default('dry-run'),
+  /** The site's public address, used in links inside emails (e.g. opt-out). */
+  PUBLIC_APP_URL: z.url().default('http://localhost:5173'),
 
   /** Website assistant. Without a key, an offline scripted assistant runs instead. */
   ANTHROPIC_API_KEY: z.string().min(1).optional(),

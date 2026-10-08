@@ -16,6 +16,7 @@ import { chatRoutes } from './routes/chat.js';
 import { healthRoutes } from './routes/health.js';
 import { journeyRoutes } from './routes/journeys.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { publicLinkRoutes } from './routes/publicLinks.js';
 import { simulatorRoutes } from './routes/simulator.js';
 import { trainRoutes } from './routes/trains.js';
 import { originCheck } from './security/origin.js';
@@ -60,6 +61,7 @@ export async function buildApp({
     inApp: new InAppChannel(engineStore),
     email: config.EMAIL_MODE === 'dry-run' ? new DryRunEmailChannel(app.log) : null,
     log: app.log,
+    appUrl: config.PUBLIC_APP_URL,
   });
   app.decorate('alerts', alerts);
 
@@ -99,6 +101,7 @@ export async function buildApp({
   await app.register(authRoutes, { prefix: '/api/auth', data, config });
   await app.register(journeyRoutes, { prefix: '/api/journeys' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
+  await app.register(publicLinkRoutes, { prefix: '/api' });
   await app.register(chatRoutes, { prefix: '/api/chat', assistant, clock });
   await app.register(trainRoutes, { prefix: '/api/trains', trains });
   if (trains.simulator && simulatorEnabled(config)) {

@@ -4,9 +4,21 @@ import type {
   AddRecipientInput,
   AlertType,
   CreateJourneyInput,
+  JourneySettings,
   UpdateAlertRuleInput,
 } from '../schemas/journey.js';
 import { newId, nowIso, randomToken } from './util.js';
+
+export class DuplicateRecipientError extends Error {
+  constructor() {
+    super('That email is already on this journey.');
+  }
+}
+
+const isUniqueViolation = (err: unknown) => {
+  const e = err as { code?: string; message?: string };
+  return e.code === 'SQLITE_CONSTRAINT_UNIQUE' || /UNIQUE constraint failed/.test(e.message ?? '');
+};
 
 export interface Journey {
   id: string;
@@ -18,6 +30,10 @@ export interface Journey {
   journeyDate: string;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   alertTypes: AlertType[];
+  /** Smart rules, "leave now" and connection settings. */
+  settings: JourneySettings;
+  /** Secret for the invite link, if one is active. Only ever shown to the owner. */
+  inviteToken: string | null;
   createdAt: string;
 }
 
@@ -92,6 +108,16 @@ const toJourney = (r: any): Journey => ({
         (a, b) => ALERT_TYPES.indexOf(a) - ALERT_TYPES.indexOf(b),
       )
     : [],
+  settings: {
+    minDelayMinutes: r.min_delay_minutes ?? null,
+    quietHoursStart: r.quiet_hours_start ?? null,
+    quietHoursEnd: r.quiet_hours_end ?? null,
+    travelTimeMinutes: r.travel_time_minutes ?? null,
+    leaveBufferMinutes: r.leave_buffer_minutes ?? 15,
+    connectsToJourneyId: r.connects_to_journey_id ?? null,
+    connectionBufferMinutes: r.connection_buffer_minutes ?? 30,
+  },
+  inviteToken: r.invite_token ?? null,
   createdAt: r.created_at,
 });
 const toRule = (r: any): AlertRule => ({
@@ -130,7 +156,11 @@ const toChatSession = (r: any): ChatSession => ({
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const JOURNEY_SELECT = `
-  SELECT j.*, (SELECT group_concat(type) FROM alert_rules WHERE journey_id = j.id) AS alert_types
+  SELECT j.*,
+    (SELECT group_concat(type) FROM alert_rules WHERE journey_id = j.id) AS alert_types,
+    (SELECT min_delay_minutes FROM alert_rules WHERE journey_id = j.id AND type = 'DELAY') AS min_delay_minutes,
+    (SELECT quiet_hours_start FROM alert_rules WHERE journey_id = j.id AND quiet_hours_start IS NOT NULL LIMIT 1) AS quiet_hours_start,
+    (SELECT quiet_hours_end FROM alert_rules WHERE journey_id = j.id AND quiet_hours_end IS NOT NULL LIMIT 1) AS quiet_hours_end
   FROM journeys j`;
 
 /**
@@ -187,6 +217,53 @@ export function createUserData(db: Db, userId: string) {
         for (const type of input.alertTypes) insertRule.run(newId(), id, type, createdAt);
       })();
       return this.get(id)!;
+    },
+
+    /**
+     * Saves smart rules ("leave now", connection, quiet hours on every alert
+     * type, delay threshold on the delay alert). The connection target must be
+     * another of this user's journeys.
+     */
+    updateSettings(
+      journeyId: string,
+      settings: JourneySettings,
+    ): Journey | 'NOT_FOUND' | 'BAD_CONNECTION' {
+      if (!ownsJourney(journeyId)) return 'NOT_FOUND';
+      const target = settings.connectsToJourneyId;
+      if (target && (target === journeyId || !ownsJourney(target))) return 'BAD_CONNECTION';
+      db.transaction(() => {
+        db.prepare(
+          `UPDATE journeys SET travel_time_minutes = ?, leave_buffer_minutes = ?,
+             connects_to_journey_id = ?, connection_buffer_minutes = ?
+           WHERE id = ? AND user_id = ?`,
+        ).run(
+          settings.travelTimeMinutes,
+          settings.leaveBufferMinutes,
+          target,
+          settings.connectionBufferMinutes,
+          journeyId,
+          userId,
+        );
+        db.prepare(
+          `UPDATE alert_rules SET quiet_hours_start = ?, quiet_hours_end = ? WHERE journey_id = ?`,
+        ).run(settings.quietHoursStart, settings.quietHoursEnd, journeyId);
+        db.prepare(
+          `UPDATE alert_rules SET min_delay_minutes = ? WHERE journey_id = ? AND type = 'DELAY'`,
+        ).run(settings.minDelayMinutes, journeyId);
+      })();
+      return this.get(journeyId)!;
+    },
+
+    /** Turns the invite link on (new secret each time) or off. Null if not this user's journey. */
+    setInvite(journeyId: string, enabled: boolean): { inviteToken: string | null } | null {
+      if (!ownsJourney(journeyId)) return null;
+      const token = enabled ? randomToken(18) : null;
+      db.prepare('UPDATE journeys SET invite_token = ? WHERE id = ? AND user_id = ?').run(
+        token,
+        journeyId,
+        userId,
+      );
+      return { inviteToken: token };
     },
 
     /** Returns false if the journey doesn't exist or isn't this user's. */
@@ -261,18 +338,24 @@ export function createUserData(db: Db, userId: string) {
         opted_out_at: null,
         created_at: nowIso(),
       };
-      db.prepare(
+      const insert = db.prepare(
         `INSERT INTO recipients (id, journey_id, name, email, channel, opt_out_token, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        row.id,
-        row.journey_id,
-        row.name,
-        row.email,
-        row.channel,
-        row.opt_out_token,
-        row.created_at,
       );
+      try {
+        insert.run(
+          row.id,
+          row.journey_id,
+          row.name,
+          row.email,
+          row.channel,
+          row.opt_out_token,
+          row.created_at,
+        );
+      } catch (err) {
+        if (isUniqueViolation(err)) throw new DuplicateRecipientError();
+        throw err;
+      }
       return toRecipient(row);
     },
 

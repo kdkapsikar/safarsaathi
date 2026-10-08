@@ -18,12 +18,14 @@ const START = '2026-10-09';
 const at = (hhmm: string, day = 1) => istInstant(START, hhmm, day);
 
 let data: DataAccess;
+let db: ReturnType<typeof openDatabase>;
 let sim: MockProvider;
 let alice: User;
 let bob: User;
 
 beforeEach(() => {
-  data = createDataAccess(openDatabase(':memory:'));
+  db = openDatabase(':memory:');
+  data = createDataAccess(db);
   sim = new MockProvider();
   alice = data.accounts.createUser({
     name: 'Alice Rao',
@@ -82,6 +84,7 @@ describe('tool authorization', () => {
         .map((t) => t.name)
         .sort();
     expect(names(null)).toEqual([
+      'get_leave_time',
       'get_live_status',
       'get_platform_info',
       'get_schedule',
@@ -92,9 +95,11 @@ describe('tool authorization', () => {
       'create_journey',
       'delete_journey',
       'get_journey_status',
+      'get_leave_time',
       'get_live_status',
       'get_platform_info',
       'get_schedule',
+      'list_my_alerts',
       'list_my_journeys',
       'site_help',
       'trains_between',
@@ -119,20 +124,23 @@ describe('tool authorization', () => {
     expect(names).not.toContain('trains_between');
   });
 
-  it.each(['list_my_journeys', 'get_journey_status', 'create_journey', 'delete_journey'])(
-    'a visitor cannot call %s even by name',
-    async (name) => {
-      const out = await runTool(
-        name,
-        { journey_id: '00000000-0000-4000-8000-000000000000' },
-        ctxFor(null),
-      );
-      expect(out).toMatchObject({
-        isError: true,
-        result: { error: `Tool ${name} is not available.` },
-      });
-    },
-  );
+  it.each([
+    'list_my_journeys',
+    'get_journey_status',
+    'create_journey',
+    'delete_journey',
+    'list_my_alerts',
+  ])('a visitor cannot call %s even by name', async (name) => {
+    const out = await runTool(
+      name,
+      { journey_id: '00000000-0000-4000-8000-000000000000' },
+      ctxFor(null),
+    );
+    expect(out).toMatchObject({
+      isError: true,
+      result: { error: `Tool ${name} is not available.` },
+    });
+  });
 
   it("journey tools only ever see the session user's data, whatever ids are passed", async () => {
     const bobs = addJourney(bob);
@@ -219,6 +227,57 @@ describe('offline assistant', () => {
     const r = await ask('add 12301 from HWH to NDLS', ctxFor(null));
     expect(r.text).toMatch(/Sign in/);
     expect(r.proposals).toEqual([]);
+  });
+
+  it('answers "when should I leave?" from the saved travel time and live delay', async () => {
+    sim.setScenario('12951', 'ON_TIME');
+    const j = addJourney(alice);
+    data.forUser(alice.id).journeys.updateSettings(j.id, {
+      ...j.settings,
+      travelTimeMinutes: 45,
+      leaveBufferMinutes: 15,
+    });
+    const r = await ask('When should I leave?', ctxFor(alice, at('14:00')));
+    expect(r.text).toBe(
+      'Leave by 2026-10-09 16:00 IST. 12951 is expected to depart MMCT at 2026-10-09 17:00 IST; that allows 45 min to get there plus 15 min to spare. As of 2026-10-09 14:00 IST (simulated data).',
+    );
+  });
+
+  it('asks for the travel time when it is not known', async () => {
+    addJourney(alice);
+    const r = await ask('when should I leave for 12951', ctxFor(alice, at('14:00')));
+    expect(r.text).toMatch(/How many minutes does it take you to get to the station/);
+  });
+
+  it('works out a leave time for visitors from the question itself', async () => {
+    sim.setScenario('12951', 'ON_TIME');
+    const r = await ask(
+      'When should I leave for 12951 at MMCT? It takes 30 minutes',
+      ctxFor(null, at('14:00')),
+    );
+    expect(r.text).toMatch(/^Leave by 2026-10-09 16:15 IST\./);
+  });
+
+  it("explains why an alert was sent, using the journey's own settings", async () => {
+    const j = addJourney(alice);
+    data.forUser(alice.id).journeys.updateSettings(j.id, { ...j.settings, minDelayMinutes: 30 });
+    db.prepare(
+      `INSERT INTO notifications (id, user_id, journey_id, event_key, title, body, created_at)
+       VALUES ('n1', ?, ?, 'DELAY:60', '12951 is running 1 h 5 min late', 'body', '2026-10-09T15:30:00.000Z')`,
+    ).run(alice.id, j.id);
+
+    const out = await runTool('list_my_alerts', {}, ctxFor(alice));
+    expect(out.result['alerts']).toEqual([
+      expect.objectContaining({
+        train_number: '12951',
+        why: expect.stringMatching(/reached 60 minutes.*once it's 30 minutes late/),
+      }),
+    ]);
+    const r = await ask('Why did I get that alert?', ctxFor(alice));
+    expect(r.text).toMatch(
+      /^"12951 is running 1 h 5 min late" \(sent 2026-10-09 21:00 IST\): The train's delay reached 60 minutes/,
+    );
+    expect((await runTool('list_my_alerts', {}, ctxFor(bob))).result['alerts']).toEqual([]);
   });
 
   it('answers site questions from the help file', async () => {

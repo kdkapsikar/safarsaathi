@@ -7,6 +7,7 @@ import { DEMO_MODE } from './lib/api';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
+import { JoinPage, OptOutPage } from './pages/PublicLink';
 import { Simulator } from './pages/Simulator';
 
 function Loading() {
@@ -65,6 +66,8 @@ export function AppRoutes() {
         }
       />
       <Route path="/simulator" element={<Simulator />} />
+      <Route path="/join/:token" element={<JoinPage />} />
+      <Route path="/optout/:token" element={<OptOutPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

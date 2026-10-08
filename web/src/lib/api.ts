@@ -1,4 +1,6 @@
-import type { AlertType, CreateJourneyInput } from '@safar-saathi/server/schemas';
+import type { AlertType, CreateJourneyInput, JourneySettings } from '@safar-saathi/server/schemas';
+
+export type { JourneySettings };
 
 export interface User {
   id: string;
@@ -17,7 +19,36 @@ export interface Journey {
   journeyDate: string;
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   alertTypes: AlertType[];
+  settings: JourneySettings;
+  inviteToken: string | null;
   createdAt: string;
+}
+
+export interface Recipient {
+  id: string;
+  journeyId: string;
+  name: string;
+  email: string;
+  channel: 'EMAIL';
+  optedOut: boolean;
+  createdAt: string;
+}
+
+export interface InviteInfo {
+  trainNumber: string;
+  fromStationCode: string;
+  toStationCode: string;
+  journeyDate: string;
+  ownerFirstName: string;
+}
+
+export interface OptOutInfo {
+  recipientName: string;
+  trainNumber: string;
+  fromStationCode: string;
+  toStationCode: string;
+  journeyDate: string;
+  optedOut: boolean;
 }
 
 export type StopState = 'UPCOMING' | 'ARRIVED' | 'DEPARTED' | 'SKIPPED';
@@ -189,6 +220,28 @@ export const api = {
   createJourney: (body: CreateJourneyInput) =>
     request<{ journey: Journey }>('/api/journeys', json(body)),
   deleteJourney: (id: string) => request<void>(`/api/journeys/${id}`, { method: 'DELETE' }),
+  saveJourneySettings: (id: string, settings: JourneySettings) =>
+    request<{ journey: Journey }>(`/api/journeys/${id}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+  recipients: (journeyId: string) =>
+    request<{ recipients: Recipient[] }>(`/api/journeys/${journeyId}/recipients`),
+  addRecipient: (journeyId: string, body: { name: string; email: string }) =>
+    request<{ recipient: Recipient }>(`/api/journeys/${journeyId}/recipients`, json(body)),
+  removeRecipient: (journeyId: string, recipientId: string) =>
+    request<void>(`/api/journeys/${journeyId}/recipients/${recipientId}`, { method: 'DELETE' }),
+  enableInvite: (journeyId: string) =>
+    request<{ inviteToken: string }>(`/api/journeys/${journeyId}/invite`, { method: 'POST' }),
+  disableInvite: (journeyId: string) =>
+    request<void>(`/api/journeys/${journeyId}/invite`, { method: 'DELETE' }),
+
+  invite: (token: string) => request<{ invite: InviteInfo }>(`/api/invites/${token}`),
+  joinInvite: (token: string, body: { name: string; email: string }) =>
+    request<{ joined: true }>(`/api/invites/${token}`, json(body)),
+  optOutInfo: (token: string) => request<{ optOut: OptOutInfo }>(`/api/opt-out/${token}`),
+  optOut: (token: string) =>
+    request<{ optedOut: true }>(`/api/opt-out/${token}`, { method: 'POST' }),
 
   /** With `boardingStation`, `date` is the boarding date and the server finds the right run. */
   trainStatus: (
@@ -290,3 +343,7 @@ export async function streamChat(
     if (done) break;
   }
 }
+
+/** Full URL of an in-app path, respecting the GitHub Pages base path. */
+export const appUrl = (path: string) =>
+  `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}${path}`;

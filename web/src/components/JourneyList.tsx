@@ -3,13 +3,19 @@ import type { Journey } from '../lib/api';
 import { formatJourneyDate, relativeDateLabel } from '../lib/dates';
 import { ALERT_TYPE_INFO } from './alertTypes';
 import { ConfirmDialog } from './ConfirmDialog';
+import { JourneySettingsForm } from './JourneySettingsForm';
 import { LiveStatus } from './LiveStatus';
+import { RecipientsPanel } from './RecipientsPanel';
 
 interface Props {
   journeys: Journey[];
   onDelete: (id: string) => Promise<void>;
+  /** A journey's settings or invite link changed. */
+  onChange?: (journey: Journey) => void;
   now?: () => Date;
 }
+
+type Panel = 'settings' | 'people';
 
 const DATE_BADGE: Record<string, string> = {
   Today: 'bg-saffron text-ink',
@@ -19,7 +25,15 @@ const DATE_BADGE: Record<string, string> = {
   Past: 'bg-line text-muted',
 };
 
-export function JourneyList({ journeys, onDelete, now = () => new Date() }: Props) {
+export function JourneyList({
+  journeys,
+  onDelete,
+  onChange = () => {},
+  now = () => new Date(),
+}: Props) {
+  const [open, setOpen] = useState<Record<string, Panel | undefined>>({});
+  const toggle = (id: string, panel: Panel) =>
+    setOpen((o) => ({ ...o, [id]: o[id] === panel ? undefined : panel }));
   const [pending, setPending] = useState<Journey | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
@@ -128,6 +142,8 @@ export function JourneyList({ journeys, onDelete, now = () => new Date() }: Prop
                   trainNumber={j.trainNumber}
                   date={j.journeyDate}
                   boardingCode={j.fromStationCode}
+                  travelTimeMinutes={j.settings.travelTimeMinutes}
+                  leaveBufferMinutes={j.settings.leaveBufferMinutes}
                 />
 
                 <ul aria-label="Alerts" className="mt-3 flex flex-wrap gap-1.5">
@@ -140,6 +156,49 @@ export function JourneyList({ journeys, onDelete, now = () => new Date() }: Prop
                     </li>
                   ))}
                 </ul>
+
+                {(() => {
+                  const next = journeys.find((o) => o.id === j.settings.connectsToJourneyId);
+                  return next ? (
+                    <p className="mt-2 text-sm text-muted">
+                      Connects to {next.trainNumber} at {next.fromStationCode} ·{' '}
+                      {j.settings.connectionBufferMinutes} min to change
+                    </p>
+                  ) : null;
+                })()}
+
+                <div className="mt-3 flex gap-2 border-t border-line pt-3">
+                  {(['settings', 'people'] as const).map((panel) => (
+                    <button
+                      key={panel}
+                      type="button"
+                      aria-expanded={open[j.id] === panel}
+                      aria-controls={`${j.id}-${panel}`}
+                      onClick={() => toggle(j.id, panel)}
+                      className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                        open[j.id] === panel ? 'bg-teal text-white' : 'bg-paper hover:bg-teal-soft'
+                      }`}
+                    >
+                      {panel === 'settings' ? 'Settings' : 'People'}
+                    </button>
+                  ))}
+                </div>
+                {open[j.id] && (
+                  <div id={`${j.id}-${open[j.id]}`} className="mt-3">
+                    {open[j.id] === 'settings' ? (
+                      <JourneySettingsForm
+                        journey={j}
+                        others={journeys.filter((o) => o.id !== j.id)}
+                        onSaved={onChange}
+                      />
+                    ) : (
+                      <RecipientsPanel
+                        journey={j}
+                        onInviteChange={(inviteToken) => onChange({ ...j, inviteToken })}
+                      />
+                    )}
+                  </div>
+                )}
               </article>
             </li>
           );

@@ -117,7 +117,15 @@ export function Dashboard() {
               </button>
             </div>
           )}
-          {load.state === 'ready' && <JourneyList journeys={journeys} onDelete={remove} />}
+          {load.state === 'ready' && (
+            <JourneyList
+              journeys={journeys}
+              onDelete={remove}
+              onChange={(updated) =>
+                setJourneys((js) => js.map((x) => (x.id === updated.id ? updated : x)))
+              }
+            />
+          )}
         </section>
       </main>
     </div>

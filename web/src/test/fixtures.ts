@@ -17,6 +17,16 @@ export const journey = (overrides: Partial<Journey> = {}): Journey => ({
   journeyDate: '2026-10-09',
   status: 'ACTIVE',
   alertTypes: ['DEPARTURE', 'DELAY'],
+  settings: {
+    minDelayMinutes: null,
+    quietHoursStart: null,
+    quietHoursEnd: null,
+    travelTimeMinutes: null,
+    leaveBufferMinutes: 15,
+    connectsToJourneyId: null,
+    connectionBufferMinutes: 30,
+  },
+  inviteToken: null,
   createdAt: '2026-10-08T10:00:00.000Z',
   ...overrides,
 });

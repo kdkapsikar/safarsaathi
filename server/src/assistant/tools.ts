@@ -11,6 +11,8 @@ import {
   type TrainDataProvider,
   type TrainStatus,
 } from '../trains/index.js';
+import { explainEventKey } from '../alerts/explain.js';
+import { computeLeaveTime } from '../alerts/timing.js';
 import { searchHelp } from './siteHelp.js';
 
 /**
@@ -306,6 +308,130 @@ export const TOOLS: AssistantTool[] = [
   }),
 
   tool({
+    name: 'get_leave_time',
+    description:
+      'When to leave home to catch a train: live expected departure at the boarding station minus travel time to the station and a safety buffer. Use journey_id for a saved journey (uses its saved travel time unless travel_minutes is given), or train_number + station_code + travel_minutes.',
+    scope: 'public',
+    needs: 'liveStatus',
+    schema: z.object({
+      journey_id: z.uuid().optional(),
+      train_number: trainNumber.optional(),
+      station_code: stationCode.optional(),
+      date: date.optional(),
+      travel_minutes: z
+        .number()
+        .int()
+        .min(0)
+        .max(600)
+        .optional()
+        .describe('Door-to-station travel time'),
+      buffer_minutes: z.number().int().min(0).max(180).optional(),
+    }),
+    async run(input, ctx) {
+      let train = input.train_number;
+      let station = input.station_code;
+      let day = input.date;
+      let travel = input.travel_minutes;
+      let buffer = input.buffer_minutes ?? 15;
+      if (input.journey_id) {
+        const j = ctx.mine?.journeys.get(input.journey_id);
+        if (!j) return { result: { error: 'No such journey for this user.' }, isError: true };
+        train = j.trainNumber;
+        station = j.fromStationCode;
+        day = j.journeyDate;
+        travel ??= j.settings.travelTimeMinutes ?? undefined;
+        buffer = input.buffer_minutes ?? j.settings.leaveBufferMinutes;
+      }
+      if (!train || !station) {
+        return {
+          result: { error: 'Need a journey_id, or train_number and station_code.' },
+          isError: true,
+        };
+      }
+      if (travel === undefined) {
+        return {
+          result: {
+            error:
+              'Travel time to the station is unknown. Ask the user how many minutes it takes to get there.',
+            needs_travel_time: true,
+          },
+          isError: true,
+        };
+      }
+      try {
+        const { status } = await liveStatus(ctx, train, day, station);
+        if (!status)
+          return {
+            result: { error: `No data for train ${train}.`, not_found: true },
+            isError: true,
+          };
+        const t = computeLeaveTime(status, station, travel, buffer, ctx.now);
+        const base = {
+          train_number: train,
+          station_code: station,
+          as_of: istStamp(status.fetchedAt),
+        };
+        if (t.state !== 'OK') return { result: { ...base, state: t.state } };
+        return {
+          result: {
+            ...base,
+            state: 'OK',
+            leave_by: istStamp(t.leaveBy),
+            minutes_until_leave: t.minutesUntilLeave,
+            expected_departure: istStamp(t.expectedDeparture),
+            scheduled_departure: istStamp(t.scheduledDeparture),
+            delay_minutes: t.delayMinutes,
+            travel_minutes: t.travelMinutes,
+            buffer_minutes: t.bufferMinutes,
+            data_source:
+              status.source === 'simulator'
+                ? 'simulator (simulated, not real data)'
+                : status.source,
+          },
+        };
+      } catch (err) {
+        if (err instanceof ProviderError) return unavailable(err.kind);
+        throw err;
+      }
+    },
+  }),
+
+  tool({
+    name: 'list_my_alerts',
+    description:
+      "The signed-in user's recent alerts, newest first, each with a plain explanation of why it was sent (thresholds, quiet hours, leave-now maths).",
+    scope: 'user',
+    schema: z.object({ limit: z.number().int().min(1).max(20).optional() }),
+    async run(input, ctx) {
+      const mine = ctx.mine!;
+      return {
+        result: {
+          alerts: mine.notifications.list(input.limit ?? 5).map((n) => {
+            const j = n.journeyId ? mine.journeys.get(n.journeyId) : null;
+            return {
+              title: n.title,
+              message: n.body,
+              sent_at: istStamp(n.createdAt),
+              train_number: j?.trainNumber ?? null,
+              why: explainEventKey(
+                n.eventKey,
+                j?.settings ?? {
+                  minDelayMinutes: null,
+                  quietHoursStart: null,
+                  quietHoursEnd: null,
+                  travelTimeMinutes: null,
+                  leaveBufferMinutes: 15,
+                  connectionBufferMinutes: 30,
+                },
+              ),
+            };
+          }),
+        },
+      };
+    },
+  }),
+
+  tool({
     name: 'list_my_journeys',
     description: "The signed-in user's saved journeys (newest first), with ids for other tools.",
     scope: 'user',
@@ -320,6 +446,8 @@ export const TOOLS: AssistantTool[] = [
             to: j.toStationCode,
             boarding_date: j.journeyDate,
             alerts: j.alertTypes,
+            travel_time_minutes: j.settings.travelTimeMinutes,
+            connects_to_journey_id: j.settings.connectsToJourneyId,
           })),
         },
       };

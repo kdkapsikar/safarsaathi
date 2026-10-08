@@ -30,7 +30,7 @@ Departure: when the train leaves your station. Arrival: about 30 minutes before 
 ## Where alerts appear
 
 keywords: bell, where, see, inbox, notifications, email, sms, whatsapp
-Alerts appear behind the bell icon on your dashboard. Email delivery is being set up and isn't live yet. SMS and WhatsApp are planned.
+Alerts appear behind the bell icon on your dashboard. Email delivery (for you and the people you add) is being set up and isn't live yet. SMS and WhatsApp are planned. Ask me "Why did I get that alert?" for an explanation.
 
 ## Quiet hours and delay thresholds
 

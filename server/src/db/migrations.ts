@@ -155,4 +155,23 @@ export const migrations: Migration[] = [
       CREATE INDEX assistant_proposals_user ON assistant_proposals(user_id, created_at DESC);
     `,
   },
+  {
+    id: 3,
+    name: 'smart_rules_recipients_connections',
+    sql: /* sql */ `
+      -- "Leave home now": minutes from home to the boarding station, plus a safety buffer.
+      ALTER TABLE journeys ADD COLUMN travel_time_minutes INTEGER
+        CHECK (travel_time_minutes IS NULL OR travel_time_minutes BETWEEN 0 AND 600);
+      ALTER TABLE journeys ADD COLUMN leave_buffer_minutes INTEGER NOT NULL DEFAULT 15
+        CHECK (leave_buffer_minutes BETWEEN 0 AND 180);
+      -- Connection mode: this journey feeds into another of the same user's journeys.
+      ALTER TABLE journeys ADD COLUMN connects_to_journey_id TEXT
+        REFERENCES journeys(id) ON DELETE SET NULL;
+      ALTER TABLE journeys ADD COLUMN connection_buffer_minutes INTEGER NOT NULL DEFAULT 30
+        CHECK (connection_buffer_minutes BETWEEN 0 AND 240);
+      -- Invite link that lets family or a driver add themselves as recipients.
+      ALTER TABLE journeys ADD COLUMN invite_token TEXT;
+      CREATE UNIQUE INDEX journeys_invite_token ON journeys(invite_token) WHERE invite_token IS NOT NULL;
+    `,
+  },
 ];

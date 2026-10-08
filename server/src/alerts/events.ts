@@ -1,6 +1,7 @@
 import { formatDelay, formatIstTime } from '../schemas/format.js';
 import type { AlertType } from '../schemas/journey.js';
 import type { StationStatus, TrainStatus } from '../trains/types.js';
+import { computeLeaveTime, type ConnectionRisk } from './timing.js';
 
 export type EventKind =
   | 'DEPARTED'
@@ -8,7 +9,9 @@ export type EventKind =
   | 'DELAY_CROSSED_THRESHOLD'
   | 'PLATFORM_CHANGED'
   | 'CANCELLED'
-  | 'DIVERTED';
+  | 'DIVERTED'
+  | 'LEAVE_NOW'
+  | 'CONNECTION_AT_RISK';
 
 export interface AlertEvent {
   kind: EventKind;
@@ -18,6 +21,8 @@ export interface AlertEvent {
   ruleType: AlertType | null;
   /** Critical events ignore quiet hours. */
   critical: boolean;
+  /** Only for the passenger (e.g. "leave home now"), not for people waiting. */
+  ownerOnly?: boolean;
   title: string;
   body: string;
 }
@@ -28,6 +33,9 @@ export interface JourneyContext {
   toStationCode: string;
   /** The rule's delay threshold, if any (DELAY rule). */
   minDelayMinutes: number | null;
+  /** "Leave now": door-to-station minutes (null = off) and safety buffer. */
+  travelTimeMinutes?: number | null;
+  leaveBufferMinutes?: number;
 }
 
 export const DEFAULT_DELAY_THRESHOLD = 15;
@@ -154,6 +162,32 @@ export function deriveEvents(
     });
   }
 
+  // Time to leave home, recomputed from the live delay on every run.
+  if (j.travelTimeMinutes !== null && j.travelTimeMinutes !== undefined) {
+    const leave = computeLeaveTime(
+      status,
+      j.fromStationCode,
+      j.travelTimeMinutes,
+      j.leaveBufferMinutes ?? 15,
+      now,
+    );
+    if (leave.state === 'OK' && leave.minutesUntilLeave <= 0 && boarding) {
+      events.push({
+        kind: 'LEAVE_NOW',
+        key: `LEAVE_NOW:${boarding.code}`,
+        ruleType: null,
+        critical: true,
+        ownerOnly: true,
+        title: `Time to leave for ${boarding.name}`,
+        body: `Leave now for ${status.trainNumber}: it's expected to depart ${boarding.code} at ${formatIstTime(
+          leave.expectedDeparture,
+        )}${leave.delayMinutes > 0 ? ` (${formatDelay(leave.delayMinutes)})` : ''}. That allows ${
+          leave.travelMinutes
+        } min to get there plus ${leave.bufferMinutes} min to spare. ${asOf}`,
+      });
+    }
+  }
+
   // Platform announced or changed at the boarding station (until departure).
   if (boarding && boarding.state === 'UPCOMING' && boarding.platform) {
     const was = prevBoarding?.platform;
@@ -173,4 +207,28 @@ export function deriveEvents(
   }
 
   return events;
+}
+
+/** The connection alert for a journey feeding into another, if the delay threatens it. */
+export function connectionEvent(
+  risk: ConnectionRisk,
+  first: TrainStatus,
+  second: { journeyId: string; trainNumber: string; stationCode: string },
+): AlertEvent | null {
+  if (!risk || risk.level === 'OK') return null;
+  const asOf = `As of ${formatIstTime(first.fetchedAt)}.`;
+  const missed = risk.level === 'MISSED';
+  return {
+    kind: 'CONNECTION_AT_RISK',
+    key: `CONNECTION:${second.journeyId}:${risk.level}`,
+    ruleType: null,
+    critical: true,
+    ownerOnly: true,
+    title: missed
+      ? `You may miss your connection to ${second.trainNumber}`
+      : `Tight connection to ${second.trainNumber}`,
+    body: missed
+      ? `${first.trainNumber} is now expected at ${formatIstTime(risk.arriveAt)}, after ${second.trainNumber} leaves ${second.stationCode} at ${formatIstTime(risk.departAt)}. ${asOf}`
+      : `${first.trainNumber} is now expected at ${formatIstTime(risk.arriveAt)}, leaving ${risk.spareMinutes} min to catch ${second.trainNumber} at ${second.stationCode} (${formatIstTime(risk.departAt)}); you wanted ${risk.bufferMinutes}. ${asOf}`,
+  };
 }

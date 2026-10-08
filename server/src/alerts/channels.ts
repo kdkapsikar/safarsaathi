@@ -9,7 +9,7 @@ export interface OutgoingNotification {
   /** Exactly one of these: the journey owner (in-app + optional email), or a recipient. */
   to:
     | { kind: 'owner'; userId: string; name: string; email: string }
-    | { kind: 'recipient'; name: string; email: string };
+    | { kind: 'recipient'; name: string; email: string; optOutUrl: string };
 }
 
 /**
@@ -49,8 +49,9 @@ export class DryRunEmailChannel implements NotificationChannel {
 
   async deliver(n: OutgoingNotification): Promise<void> {
     this.sent.push(n);
+    const footer = n.to.kind === 'recipient' ? `\n\nStop these alerts: ${n.to.optOutUrl}` : '';
     this.log.info(
-      { to: n.to.email, subject: n.title, body: n.body },
+      { to: n.to.email, subject: n.title, body: n.body + footer },
       '[email dry-run] would send alert email',
     );
   }

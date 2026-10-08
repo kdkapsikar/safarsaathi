@@ -37,6 +37,7 @@ function setup() {
     inApp: new InAppChannel(store),
     email,
     log,
+    appUrl: 'https://safar.example',
   });
   alice = data.forUser(
     data.accounts.createUser({ name: 'Alice', email: 'alice@example.com', passwordHash: 'h' }).id,
@@ -229,5 +230,75 @@ describe('AlertEngine', () => {
     await runAt(at('20:00'));
     await runAt(at('21:00'));
     expect(db.prepare('SELECT count(*) AS n FROM train_snapshots').get()).toEqual({ n: 1 });
+  });
+
+  it('sends "leave now" once at the leave-by time, to the passenger only', async () => {
+    scenario('ON_TIME');
+    const j = addJourney(alice, ['DELAY']);
+    alice.journeys.updateSettings(j.id, {
+      ...j.settings,
+      travelTimeMinutes: 45,
+      leaveBufferMinutes: 15,
+    });
+    alice.recipients.add(j.id, { name: 'Driver', email: 'driver@example.com' });
+
+    expect((await runAt(at('15:58'))).notificationsSent).toBe(0);
+    await runAt(at('16:00'));
+    await runAt(at('16:01'));
+    expect(titles(alice)).toEqual(['Time to leave for Mumbai Central']);
+    expect(email.sent.map((n) => n.to.email)).not.toContain('driver@example.com');
+  });
+
+  it('"leave now" waits for a late train (recomputed from the live delay)', async () => {
+    scenario('GROWING_DELAY');
+    const j = addJourney(alice, ['DEPARTURE'], { from: 'BRC' }); // Vadodara, due 21:16
+    alice.journeys.updateSettings(j.id, {
+      ...j.settings,
+      travelTimeMinutes: 30,
+      leaveBufferMinutes: 10,
+    });
+    // On time, leave-by would be 20:36. By then the train is ~76 min late, so not yet.
+    await runAt(at('20:40'));
+    expect(titles(alice)).not.toContain('Time to leave for Vadodara Junction');
+    // At 22:05 it's ~86 min late: expected 22:42, minus 30 + 10 → leave by 22:02.
+    await runAt(at('22:05'));
+    expect(titles(alice)).toContain('Time to leave for Vadodara Junction');
+  });
+
+  it('warns when a delay threatens a linked connection', async () => {
+    scenario('GROWING_DELAY'); // 12951 reaches NDLS (08:32 scheduled) about 2.5 h late
+    sim.setScenario('12002', 'ON_TIME'); // 12002 leaves NDLS at 06:00 that morning
+    const first = addJourney(alice, ['DELAY']);
+    const second = addJourney(alice, ['DEPARTURE'], {
+      trainNumber: '12002',
+      from: 'NDLS',
+      to: 'AGC',
+      date: '2026-10-10',
+    });
+    alice.journeys.updateSettings(first.id, {
+      ...first.settings,
+      connectsToJourneyId: second.id,
+      connectionBufferMinutes: 30,
+    });
+
+    await runAt(at('03:00', 2));
+    const t = titles(alice);
+    expect(t).toContain('You may miss your connection to 12002');
+  });
+
+  it('puts an opt-out link in recipient emails, and opting out stops them', async () => {
+    scenario('GROWING_DELAY');
+    const j = addJourney(alice, ['DELAY']);
+    const r = alice.recipients.add(j.id, { name: 'Driver', email: 'driver@example.com' })!;
+    await runAt(at('19:00'));
+    const sent = email.sent.find((n) => n.to.email === 'driver@example.com')!;
+    expect(sent.to).toMatchObject({ kind: 'recipient' });
+    const url = (sent.to as { optOutUrl: string }).optOutUrl;
+    expect(url).toMatch(/^https:\/\/safar\.example\/optout\/[\w-]{20,}$/);
+
+    expect(data.publicLinks.optOut(url.split('/').at(-1)!)).toBe(true);
+    await runAt(at('23:00'));
+    expect(email.sent.filter((n) => n.to.email === 'driver@example.com')).toHaveLength(1);
+    expect(alice.recipients.listForJourney(j.id)!.find((x) => x.id === r.id)!.optedOut).toBe(true);
   });
 });

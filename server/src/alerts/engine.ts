@@ -10,8 +10,9 @@ import {
   type TrainStatus,
 } from '../trains/index.js';
 import type { NotificationChannel, OutgoingNotification } from './channels.js';
-import { deriveEvents } from './events.js';
+import { connectionEvent, deriveEvents, type AlertEvent } from './events.js';
 import { inQuietHours } from './quietHours.js';
+import { computeLeaveTime, connectionRisk } from './timing.js';
 
 export interface RunSummary {
   ranAt: string;
@@ -42,14 +43,21 @@ const WINDOW_AFTER_MIN = 6 * 60;
  * How often to re-check a train run: every minute close to a departure or
  * arrival, every 5 minutes otherwise while it matters, rarely when far off or done.
  */
-export function pollIntervalMinutes(previous: TrainStatus | null, now: Date): number {
+export function pollIntervalMinutes(
+  previous: TrainStatus | null,
+  now: Date,
+  /** Other moments that matter, e.g. passengers' leave-by times. */
+  extraMoments: string[] = [],
+): number {
   if (!previous) return 0;
   if (previous.state === 'ARRIVED' || previous.state === 'CANCELLED') return 30;
-  const upcoming = previous.stations
-    .filter((s) => s.state === 'UPCOMING')
-    .map((s) => s.expectedArrival ?? s.expectedDeparture)
-    .filter((t): t is string => t !== null)
-    .map((t) => minutesBetween(now, new Date(t)));
+  const upcoming = [
+    ...previous.stations
+      .filter((s) => s.state === 'UPCOMING')
+      .map((s) => s.expectedArrival ?? s.expectedDeparture)
+      .filter((t): t is string => t !== null),
+    ...extraMoments,
+  ].map((t) => minutesBetween(now, new Date(t)));
   const next = Math.min(...upcoming.map((m) => Math.abs(m)));
   if (next <= 60) return 1;
   if (previous.state === 'NOT_STARTED' && next > 360) return 15;
@@ -64,6 +72,8 @@ export interface AlertEngineDeps {
   inApp: NotificationChannel;
   email: NotificationChannel | null;
   log: FastifyBaseLogger;
+  /** Public web address, for recipients' opt-out links. */
+  appUrl: string;
 }
 
 export class AlertEngine {
@@ -99,10 +109,24 @@ export class AlertEngine {
       for (const [key, group] of groups) {
         const previous = this.deps.store.latestSnapshot(group.trainNumber, group.startDate);
         const last = this.lastPolled.get(key);
+        const leaveMoments = previous
+          ? group.journeys.flatMap((j) => {
+              if (j.travelTimeMinutes === null) return [];
+              const t = computeLeaveTime(
+                previous,
+                j.fromStationCode,
+                j.travelTimeMinutes,
+                j.leaveBufferMinutes,
+                now,
+              );
+              return t.state === 'OK' ? [t.leaveBy] : [];
+            })
+          : [];
         const due =
           force ||
           last === undefined ||
-          Math.abs(now.getTime() - last) >= pollIntervalMinutes(previous, now) * 60_000;
+          Math.abs(now.getTime() - last) >=
+            pollIntervalMinutes(previous, now, leaveMoments) * 60_000;
         if (!due) {
           summary.notDue += 1;
           continue;
@@ -179,11 +203,15 @@ export class AlertEngine {
         fromStationCode: journey.fromStationCode,
         toStationCode: journey.toStationCode,
         minDelayMinutes: delayRule?.minDelayMinutes ?? null,
+        travelTimeMinutes: journey.travelTimeMinutes,
+        leaveBufferMinutes: journey.leaveBufferMinutes,
       },
       status,
       previous,
       now,
     );
+    const connection = await this.connectionCheck(journey, status);
+    if (connection) events.push(connection);
 
     for (const event of events) {
       const rule = event.ruleType ? journey.rules.find((r) => r.type === event.ruleType) : null;
@@ -224,16 +252,46 @@ export class AlertEngine {
         summary,
       );
 
-      if (this.deps.email) {
+      if (this.deps.email && !event.ownerOnly) {
         for (const r of this.deps.store.activeRecipients(journey.id)) {
+          const optOutUrl = `${this.deps.appUrl.replace(/\/$/, '')}/optout/${r.optOutToken}`;
           await this.deliver(
-            { ...base, to: { kind: 'recipient', name: r.name, email: r.email } },
+            { ...base, to: { kind: 'recipient', name: r.name, email: r.email, optOutUrl } },
             [this.deps.email],
             { ruleId: rule?.id ?? null, recipientId: r.id },
             summary,
           );
         }
       }
+    }
+  }
+
+  /** Connection mode: does this journey's delay threaten the journey it feeds into? */
+  private async connectionCheck(
+    journey: EngineJourney,
+    status: TrainStatus,
+  ): Promise<AlertEvent | null> {
+    const next = journey.connectsTo;
+    if (!next) return null;
+    try {
+      const schedule = await this.deps.provider.getSchedule(next.trainNumber);
+      const startDate = resolveStartDate(schedule, next.fromStationCode, next.journeyDate);
+      const second = await this.deps.provider.getLiveStatus(next.trainNumber, startDate);
+      if (!second) return null;
+      const risk = connectionRisk(
+        status,
+        journey.toStationCode,
+        second,
+        next.fromStationCode,
+        journey.connectionBufferMinutes,
+      );
+      return connectionEvent(risk, status, {
+        journeyId: next.journeyId,
+        trainNumber: next.trainNumber,
+        stationCode: next.fromStationCode,
+      });
+    } catch {
+      return null; // the second train's data is unavailable; try again next run
     }
   }
 
@@ -275,13 +333,17 @@ function insideWindow(
   j: EngineJourney,
   now: Date,
 ): boolean {
+  // A long trip to the station starts the watch earlier, so "leave now" isn't missed.
+  const before = Math.max(
+    WINDOW_BEFORE_MIN,
+    (j.travelTimeMinutes ?? 0) + j.leaveBufferMinutes + 90,
+  );
   const from = schedule.stops.find((s) => s.code === j.fromStationCode);
   const to = schedule.stops.find((s) => s.code === j.toStationCode);
   if (!from || !to) return true; // can't tell; watch it
   const boardAt = istInstant(startDate, (from.departure ?? from.arrival)!, from.day);
   const arriveAt = istInstant(startDate, (to.arrival ?? to.departure)!, to.day);
   return (
-    minutesBetween(now, boardAt) <= WINDOW_BEFORE_MIN &&
-    minutesBetween(arriveAt, now) <= WINDOW_AFTER_MIN
+    minutesBetween(now, boardAt) <= before && minutesBetween(arriveAt, now) <= WINDOW_AFTER_MIN
   );
 }

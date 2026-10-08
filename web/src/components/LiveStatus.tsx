@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, SIMULATOR_CHANGED, type TrainStatus } from '../lib/api';
+import { computeLeaveTime } from '@safar-saathi/server/alerts/timing';
 import { formatDelay, formatIstTime } from '../lib/dates';
 
 const POLL_MS = 30_000;
@@ -15,13 +16,22 @@ interface Props {
   date: string;
   /** The passenger's boarding station, to show its platform and departure. */
   boardingCode: string;
+  /** "Leave now" settings: show when to leave home. */
+  travelTimeMinutes?: number | null;
+  leaveBufferMinutes?: number;
 }
 
 /**
  * One-line live status for a journey card. Always shows when the data is from
  * ("as of"), and says so plainly when there's no data rather than guessing.
  */
-export function LiveStatus({ trainNumber, date, boardingCode }: Props) {
+export function LiveStatus({
+  trainNumber,
+  date,
+  boardingCode,
+  travelTimeMinutes = null,
+  leaveBufferMinutes = 15,
+}: Props) {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
 
   const refresh = useCallback(
@@ -93,12 +103,34 @@ export function LiveStatus({ trainNumber, date, boardingCode }: Props) {
   }
   if (s.currentStation && s.state === 'RUNNING') details.push(`Last at ${s.currentStation.name}`);
 
+  const leave =
+    travelTimeMinutes !== null
+      ? computeLeaveTime(
+          s,
+          boardingCode,
+          travelTimeMinutes,
+          leaveBufferMinutes,
+          new Date(s.fetchedAt),
+        )
+      : null;
+
   return (
     <div className={`mt-3 rounded-xl px-3 py-2 text-sm ${TONE[tone]}`} aria-live="polite">
       <p className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-semibold">{headline}</span>
         {details.length > 0 && <span>{details.join(' · ')}</span>}
       </p>
+      {leave?.state === 'OK' && (
+        <p className="mt-0.5 font-semibold">
+          {leave.minutesUntilLeave <= 0
+            ? 'Time to leave now'
+            : `Leave home by ${formatIstTime(leave.leaveBy)}`}
+          <span className="font-normal">
+            {' '}
+            ({leave.travelMinutes} min travel + {leave.bufferMinutes} min spare)
+          </span>
+        </p>
+      )}
       {s.note && <p className="mt-0.5">{s.note}</p>}
       <p className="mt-0.5 text-xs opacity-75">
         as of {formatIstTime(s.fetchedAt)}
