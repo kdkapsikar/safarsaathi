@@ -12,7 +12,8 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: emailSchema,
+  /** Email, or a plain username such as the demo account's "demo". Sign-up still requires an email. */
+  email: z.string().trim().toLowerCase().min(1, 'Enter your email or username').max(254),
   password: z.string().min(1, 'Password is required').max(128),
 });
 

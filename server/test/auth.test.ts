@@ -104,6 +104,14 @@ describe('login, me and logout', () => {
     expect(wrong.json()).toEqual(unknown.json());
   });
 
+  it('signs in with a plain username, case-insensitively', async () => {
+    const { body } = await register(app);
+    db.prepare('UPDATE users SET email = ? WHERE email = ?').run('demo', body.email);
+    const res = await post('/api/auth/login', { email: ' Demo ', password: body.password });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().user.email).toBe('demo');
+  });
+
   it('me is 401 without a session or with a bogus cookie', async () => {
     expect((await me()).statusCode).toBe(401);
     expect((await me('ss_session=forged')).statusCode).toBe(401);

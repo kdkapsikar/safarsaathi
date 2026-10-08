@@ -106,7 +106,13 @@ export function AuthPage({ mode }: { mode: Mode }) {
 
         <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
           {mode === 'signup' && field('name', 'Your name', { autoComplete: 'name', maxLength: 80 })}
-          {field('email', 'Email', { type: 'email', autoComplete: 'email', inputMode: 'email' })}
+          {mode === 'signup'
+            ? field('email', 'Email', { type: 'email', autoComplete: 'email', inputMode: 'email' })
+            : field('email', 'Email or username', {
+                autoComplete: 'username',
+                autoCapitalize: 'none',
+                spellCheck: false,
+              })}
           {field('password', 'Password', {
             type: 'password',
             autoComplete: mode === 'signup' ? 'new-password' : 'current-password',

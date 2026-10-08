@@ -76,7 +76,7 @@ describe('routing and auth', () => {
       }),
     });
     renderAt('/signin');
-    await userEvent.type(await screen.findByLabelText('Email'), 'asha@example.com');
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'asha@example.com');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong-password');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.');
