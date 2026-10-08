@@ -1,0 +1,25 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets: never commit. Copy .env.example to .env instead.
+.env
+.env.*
+!.env.example
+
+# Local data (SQLite database files)
+data/
+
+# Read-only reference material from the earlier version
+reference/
+
+# Test output
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
