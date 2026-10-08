@@ -26,6 +26,7 @@
     "tsx": "^4.23.15"
   },
   "exports": {
-    "./schemas": "./src/schemas/index.ts"
+    "./schemas": "./src/schemas/index.ts",
+    "./*": "./src/*.ts"
   }
 }

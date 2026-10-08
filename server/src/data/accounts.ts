@@ -63,7 +63,11 @@ export function createAccountStore(db: Db) {
       try {
         insertUser.run(row.id, row.name, row.email, row.password_hash, row.created_at);
       } catch (err) {
-        if ((err as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const e = err as { code?: string; message?: string };
+        if (
+          e.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+          /UNIQUE constraint failed/.test(e.message ?? '')
+        ) {
           throw new EmailTakenError();
         }
         throw err;

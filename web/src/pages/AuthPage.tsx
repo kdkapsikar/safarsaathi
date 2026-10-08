@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router';
 import { loginSchema, registerSchema } from '@safar-saathi/server/schemas';
 import { useAuth } from '../auth/AuthContext';
 import { Brand } from '../components/Brand';
-import { ApiError } from '../lib/api';
+import { DEMO_ACCOUNT } from '@safar-saathi/server/db/demoAccount';
+import { ApiError, DEMO_MODE } from '../lib/api';
 
 type Mode = 'signin' | 'signup';
 type Errors = Partial<Record<'name' | 'email' | 'password' | 'form', string>>;
@@ -103,6 +104,25 @@ export function AuthPage({ mode }: { mode: Mode }) {
       <main className="mt-10 w-full max-w-sm">
         <h1 className="text-2xl font-bold tracking-tight">{copy.title}</h1>
         <p className="mt-1 text-muted">{copy.subtitle}</p>
+
+        {DEMO_MODE && mode === 'signin' && (
+          <div className="mt-6 rounded-xl border border-saffron/60 bg-saffron/10 p-3 text-sm">
+            <p className="font-semibold">Demo login</p>
+            <p className="mt-0.5">
+              Username <code className="font-mono font-semibold">{DEMO_ACCOUNT.email}</code> ·
+              Password <code className="font-mono font-semibold">{DEMO_ACCOUNT.password}</code>
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setValues({ name: '', email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password })
+              }
+              className="mt-2 text-sm font-semibold text-teal underline-offset-4 hover:underline"
+            >
+              Fill in the demo login
+            </button>
+          </div>
+        )}
 
         <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
           {mode === 'signup' && field('name', 'Your name', { autoComplete: 'name', maxLength: 80 })}

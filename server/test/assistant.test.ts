@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import { ClaudeAssistant, SYSTEM_PROMPT } from '../src/assistant/claude.js';
 import { OfflineAssistant } from '../src/assistant/offline.js';
+import '../src/assistant/siteHelpFile.js';
 import { availableTools, runTool, type ToolContext } from '../src/assistant/tools.js';
 import type { AssistantEvent, Turn } from '../src/assistant/types.js';
 import { createDataAccess, type DataAccess, type User } from '../src/data/index.js';

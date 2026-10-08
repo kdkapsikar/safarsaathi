@@ -134,10 +134,17 @@ export class ApiError extends Error {
   }
 }
 
+/** True in the GitHub Pages build, where the API runs inside the browser. */
+export const DEMO_MODE = import.meta.env.VITE_DEMO === 'true';
+
+/** fetch, or in demo builds the in-browser backend (loaded only there). */
+const transport = (input: string, init?: RequestInit): Promise<Response> =>
+  DEMO_MODE ? import('../demo/backend').then((m) => m.demoFetch(input, init)) : fetch(input, init);
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await transport(path, {
       ...init,
       credentials: 'same-origin',
       headers: init.body ? { 'Content-Type': 'application/json', ...init.headers } : init.headers,
@@ -242,7 +249,7 @@ export async function streamChat(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch('/api/chat', {
+    res = await transport('/api/chat', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },

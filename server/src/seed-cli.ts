@@ -19,5 +19,5 @@ db.close();
 
 console.log(
   `Demo account ready: ${DEMO_ACCOUNT.email} with ${count} sample journeys.\n` +
-    'Password: see DEMO_ACCOUNT in server/src/db/seed.ts.',
+    'Password: see DEMO_ACCOUNT in server/src/db/demoAccount.ts.',
 );

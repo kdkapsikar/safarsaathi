@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { migrations as defaultMigrations, type Migration } from './migrations.js';
+import { migrate } from './migrate.js';
 
 export type Db = Database.Database;
 
@@ -22,31 +22,4 @@ export function openDatabase(path: string): Db {
   return db;
 }
 
-export function migrate(db: Db, migrations: Migration[] = defaultMigrations): number[] {
-  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    applied_at TEXT NOT NULL
-  )`);
-  const applied = new Set(
-    db
-      .prepare('SELECT id FROM schema_migrations')
-      .all()
-      .map((r) => (r as { id: number }).id),
-  );
-
-  const ran: number[] = [];
-  for (const m of [...migrations].sort((a, b) => a.id - b.id)) {
-    if (applied.has(m.id)) continue;
-    db.transaction(() => {
-      db.exec(m.sql);
-      db.prepare('INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)').run(
-        m.id,
-        m.name,
-        new Date().toISOString(),
-      );
-    })();
-    ran.push(m.id);
-  }
-  return ran;
-}
+export { migrate } from './migrate.js';

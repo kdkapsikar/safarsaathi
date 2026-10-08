@@ -1,5 +1,4 @@
 import type { FastifyBaseLogger } from 'fastify';
-import { schedule as scheduleCron, type ScheduledTask } from 'node-cron';
 import type { EngineJourney, EngineStore } from '../data/engineStore.js';
 import { istDate } from '../schemas/dates.js';
 import { istInstant, minutesBetween, type Clock } from '../trains/time.js';
@@ -70,25 +69,9 @@ export interface AlertEngineDeps {
 export class AlertEngine {
   private readonly lastPolled = new Map<string, number>();
   private running = false;
-  private task: ScheduledTask | null = null;
   lastRun: RunSummary | null = null;
 
   constructor(private readonly deps: AlertEngineDeps) {}
-
-  start(cronExpression: string): void {
-    this.task = scheduleCron(
-      cronExpression,
-      () => {
-        this.runOnce().catch((err: unknown) => this.deps.log.error({ err }, 'Alert run failed'));
-      },
-      { noOverlap: true, name: 'alert-engine' },
-    );
-  }
-
-  async stop(): Promise<void> {
-    await this.task?.stop();
-    this.task = null;
-  }
 
   /** One pass over every active journey. `force` ignores the polling schedule. */
   async runOnce({ force = false } = {}): Promise<RunSummary> {

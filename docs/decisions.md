@@ -104,3 +104,20 @@ Newest last. Each entry: date, decision, reason.
 - **Streaming**: `POST /api/chat` replies with Server-Sent Events (`text`, `tool`, `proposal`, `notice`, `done`, `error`) on a hijacked Fastify reply. A closed connection aborts the model stream.
 - **Evals**: a no-hallucination set checks offline answers against `simulateStatus()` ground truth (delay, current station, platform announced or not, departed, cancelled) and that every answer carries "As of". Mocked-client tests check tool routing, error pass-through, tool hiding and refusals. Live model behaviour still needs evaluating once an API key is in use.
 - **UI**: the widget streams answers, shows what Saathi is checking, renders Confirm/Cancel cards (a confirmed change refreshes the dashboard via a `safar:journeys-changed` event), restores the signed-in user's last conversation, and starts fresh when the signed-in person changes.
+
+## 2026-10-08: GitHub Pages demo
+
+- **The owner chose a Pages-only demo**, over Pages plus a separately hosted API, or one host for everything. Pages can't run Node, so a demo build (`vite build --mode pages`, `VITE_DEMO=true`) swaps the web app's HTTP transport for an in-browser backend (`web/src/demo/backend.ts`) that answers the same `/api/...` routes.
+- **Server code is reused, not re-implemented.** The data-access layer, migrations, MockProvider, ResilientProvider, AlertEngine (event rules, idempotency) and OfflineAssistant tools run unchanged. SQLite is sql.js (WebAssembly) behind a small adapter with the better-sqlite3 API subset the DAL uses (`web/src/demo/sqlite.ts`), persisted to localStorage. To make that possible:
+  - The engine no longer imports node-cron (`index.ts` schedules it).
+  - Help topics come from a registered source (the server reads the file; the demo bundles it).
+  - IDs and tokens use Web Crypto.
+  - `migrate()` lives in its own module.
+  - `server/package.json` exports `./*` source modules for the web build.
+- **The demo account has a single source.** `DEMO_ACCOUNT` (`server/src/db/demoAccount.ts`) drives `npm run seed`, the demo's built-in account and the hint on the demo sign-in page. If it changes, returning browsers get the new password. Sign-in accepts a plain username, so the owner's `demo` login works; sign-up still requires an email.
+- **Demo limits, stated in the UI and README:**
+  - Auth is not security there (SHA-256 in the visitor's own browser).
+  - Data is per browser.
+  - Alerts are checked only while a page is open.
+  - Saathi always runs in basic (offline) mode, because an API key can't ship to browsers.
+- **Routing**: `base` and `basename` are `/safarsaathi/` (`PAGES_BASE` in CI = repo name), and `404.html` is a copy of `index.html` so deep links load the app.

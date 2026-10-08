@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { schedule } from 'node-cron';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { openDatabase } from './db/index.js';
@@ -11,7 +12,18 @@ const config = loadConfig();
 const db = openDatabase(config.DATABASE_PATH);
 const app = await buildApp({ config, db });
 app.addHook('onClose', async () => db.close());
-if (config.ENABLE_ALERT_ENGINE) app.alerts.start(config.ALERT_ENGINE_CRON);
+if (config.ENABLE_ALERT_ENGINE) {
+  const task = schedule(
+    config.ALERT_ENGINE_CRON,
+    () => {
+      app.alerts.runOnce().catch((err: unknown) => app.log.error({ err }, 'Alert run failed'));
+    },
+    { noOverlap: true, name: 'alert-engine' },
+  );
+  app.addHook('onClose', async () => {
+    await task.stop();
+  });
+}
 
 try {
   await app.listen({ port: config.API_PORT, host: config.API_HOST });

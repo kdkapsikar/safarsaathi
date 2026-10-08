@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import type { Db } from '../db/index.js';
 import { ALERT_TYPES } from '../schemas/journey.js';
 import type {
@@ -7,7 +6,7 @@ import type {
   CreateJourneyInput,
   UpdateAlertRuleInput,
 } from '../schemas/journey.js';
-import { newId, nowIso } from './util.js';
+import { newId, nowIso, randomToken } from './util.js';
 
 export interface Journey {
   id: string;
@@ -258,7 +257,7 @@ export function createUserData(db: Db, userId: string) {
         name: input.name,
         email: input.email,
         channel: 'EMAIL',
-        opt_out_token: randomBytes(24).toString('base64url'),
+        opt_out_token: randomToken(24),
         opted_out_at: null,
         created_at: nowIso(),
       };

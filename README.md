@@ -59,6 +59,16 @@ Saathi (the round button at the bottom right of every page) answers questions ab
 - **No API key (default):** an offline "basic mode" assistant matches common questions and calls the same tools. Good for previews.
 - **Real assistant:** put `ANTHROPIC_API_KEY=...` in `.env` (never commit it). `ASSISTANT_MODEL` in `.env.example` sets the model. Limits, effort and the daily token cap are in `.env.example` too.
 
+## Live demo (GitHub Pages)
+
+https://kdkapsikar.github.io/safarsaathi/ is a **demo build** that runs entirely in the browser: GitHub Pages can only host static files, so the API, the SQLite database (via sql.js/WebAssembly), the simulator, the alert engine and the offline Saathi run client-side, reusing the server's own modules. Data stays in each visitor's browser ("Reset demo" in the banner clears it).
+
+- Sign in with the demo account in `server/src/db/demoAccount.ts` (shown on the sign-in page), or sign up; accounts are local to that browser.
+- Demo sign-in is for demonstration, not security, and the real Claude assistant isn't available there (an API key can't be shipped to browsers).
+- `.github/workflows/pages.yml` builds it (`npm run build:pages -w web`) and deploys on every push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**.
+
+To try the demo build locally: `npm run build:pages -w web && npm run preview:pages -w web`, then open http://localhost:4173/safarsaathi/.
+
 ## Configuration
 
 Copy `.env.example` to `.env` to override the defaults. `.env` is git-ignored; never commit secrets.

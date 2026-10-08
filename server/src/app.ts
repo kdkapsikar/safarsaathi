@@ -5,6 +5,7 @@ import { sessionPlugin } from './auth/sessions.js';
 import { simulatorEnabled, type Config } from './config.js';
 import { AlertEngine } from './alerts/engine.js';
 import { AssistantService } from './assistant/service.js';
+import './assistant/siteHelpFile.js';
 import type { AssistantEngine } from './assistant/types.js';
 import { DryRunEmailChannel, InAppChannel } from './alerts/channels.js';
 import { createDataAccess, type DataAccess } from './data/index.js';
@@ -61,7 +62,6 @@ export async function buildApp({
     log: app.log,
   });
   app.decorate('alerts', alerts);
-  app.addHook('onClose', async () => alerts.stop());
 
   const clock = trains.simulator?.clock ?? systemClock;
   const assistant = new AssistantService({
