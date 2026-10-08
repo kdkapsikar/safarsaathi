@@ -14,6 +14,7 @@
   "scripts": {
     "predev": "node scripts/ensure-native.mjs",
     "dev": "concurrently --names api,web --prefix-colors cyan,magenta --kill-others-on-fail \"npm run dev -w server\" \"npm run dev -w web\"",
+    "seed": "node scripts/ensure-native.mjs && npm run seed -w server",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

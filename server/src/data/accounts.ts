@@ -39,6 +39,7 @@ export function createAccountStore(db: Db) {
   );
   const userByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
   const userById = db.prepare('SELECT * FROM users WHERE id = ?');
+  const updatePassword = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?');
 
   const insertSession = db.prepare(
     'INSERT INTO sessions (id, user_id, created_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?)',
@@ -73,6 +74,14 @@ export function createAccountStore(db: Db) {
     findUserForLogin(email: string): (User & { passwordHash: string }) | null {
       const r = userByEmail.get(email) as UserRow | undefined;
       return r ? { ...toUser(r), passwordHash: r.password_hash } : null;
+    },
+
+    /** Sets a new password and signs the user out everywhere. */
+    setPassword(userId: string, passwordHash: string): void {
+      db.transaction(() => {
+        updatePassword.run(passwordHash, userId);
+        db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+      })();
     },
 
     getUser(id: string): User | null {

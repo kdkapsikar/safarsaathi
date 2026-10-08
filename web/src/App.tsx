@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { AssistantWidget } from './components/assistant/AssistantWidget';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
@@ -70,6 +71,7 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <AssistantWidget />
       </AuthProvider>
     </BrowserRouter>
   );

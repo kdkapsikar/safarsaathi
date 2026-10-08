@@ -48,3 +48,292 @@ body {
 @utility btn-danger {
   @apply btn bg-bad text-white hover:bg-bad/90;
 }
+
+/* ---------- Saathi mascot (components/assistant/SaathiScene.tsx) ----------
+   One 10s story loop: 0-35% red + gate up, 35-45% yellow + gate lowering,
+   45-85% green + gate down + "Namaste!", 85-100% gate rising, back to red. */
+/* Only the animated parts pivot on their own box; static SVG transforms keep the default. */
+.saathi-scene [class*='saathi-'] {
+  transform-box: fill-box;
+}
+.saathi-body {
+  animation: saathi-breathe 3.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+.saathi-eyes {
+  animation: saathi-blink 4.6s infinite;
+  transform-origin: center;
+}
+.saathi-pupils {
+  animation: saathi-look 10s ease-in-out infinite;
+}
+.saathi-headlight-glow {
+  animation: saathi-pulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+.saathi-beam {
+  animation: saathi-beam 10s ease-in-out infinite;
+}
+.saathi-spark {
+  opacity: 0;
+  animation: saathi-spark 5s linear infinite;
+  transform-origin: center;
+}
+.saathi-cloud {
+  animation: saathi-drift 24s ease-in-out infinite alternate;
+}
+.saathi-sun-halo {
+  animation: saathi-pulse 5s ease-in-out infinite;
+  transform-origin: center;
+}
+.saathi-rail-glint {
+  animation: saathi-glint 3.5s linear infinite;
+}
+.saathi-sig-red {
+  animation: saathi-sig-red 10s steps(1, end) infinite;
+}
+.saathi-sig-yellow {
+  opacity: 0.15;
+  animation: saathi-sig-yellow 10s steps(1, end) infinite;
+}
+.saathi-sig-green {
+  opacity: 0.15;
+  animation: saathi-sig-green 10s steps(1, end) infinite;
+}
+.saathi-gate-arm {
+  transform: rotate(78deg);
+  transform-origin: right center;
+  animation: saathi-gate 10s ease-in-out infinite;
+}
+.saathi-xing-lights {
+  opacity: 0.35;
+  animation: saathi-xing-active 10s steps(1, end) infinite;
+}
+.saathi-xing-a {
+  animation: saathi-flash 0.9s steps(1, end) infinite;
+}
+.saathi-xing-b {
+  animation: saathi-flash 0.9s steps(1, end) infinite reverse;
+}
+.saathi-sparkles {
+  opacity: 0;
+  animation: saathi-sparkles 10s ease-in-out infinite;
+}
+.saathi-bubble {
+  opacity: 0;
+  transform-origin: 80% 100%;
+  animation: saathi-bubble 10s ease-out infinite;
+}
+
+@keyframes saathi-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-1.5px) scaleY(1.008);
+  }
+}
+@keyframes saathi-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes saathi-look {
+  0%,
+  30%,
+  90%,
+  100% {
+    transform: translate(0, 0);
+  }
+  38%,
+  50% {
+    transform: translate(-2px, 0);
+  }
+  58%,
+  80% {
+    transform: translate(1.5px, -1px);
+  }
+}
+@keyframes saathi-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+@keyframes saathi-beam {
+  0%,
+  40%,
+  90%,
+  100% {
+    opacity: 0.25;
+  }
+  50%,
+  82% {
+    opacity: 1;
+  }
+}
+@keyframes saathi-spark {
+  0%,
+  60%,
+  66%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  64% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+@keyframes saathi-drift {
+  from {
+    transform: translateX(-30px);
+  }
+  to {
+    transform: translateX(60px);
+  }
+}
+@keyframes saathi-glint {
+  from {
+    transform: translateX(-60px);
+  }
+  to {
+    transform: translateX(380px);
+  }
+}
+@keyframes saathi-sig-red {
+  0% {
+    opacity: 1;
+  }
+  35% {
+    opacity: 0.15;
+  }
+  85% {
+    opacity: 1;
+  }
+}
+@keyframes saathi-sig-yellow {
+  0% {
+    opacity: 0.15;
+  }
+  35% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.15;
+  }
+}
+@keyframes saathi-sig-green {
+  0% {
+    opacity: 0.15;
+  }
+  45% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.15;
+  }
+}
+@keyframes saathi-gate {
+  0%,
+  35% {
+    transform: rotate(78deg);
+  }
+  45%,
+  85% {
+    transform: rotate(0deg);
+  }
+  97%,
+  100% {
+    transform: rotate(78deg);
+  }
+}
+@keyframes saathi-xing-active {
+  0% {
+    opacity: 0.35;
+  }
+  33% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 0.35;
+  }
+}
+@keyframes saathi-flash {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+@keyframes saathi-bubble {
+  0%,
+  48% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  52%,
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  84%,
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes saathi-sparkles {
+  0%,
+  46%,
+  86%,
+  100% {
+    opacity: 0;
+  }
+  52%,
+  56%,
+  64%,
+  72%,
+  80% {
+    opacity: 1;
+  }
+  60%,
+  68%,
+  76% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saathi-scene,
+  .saathi-scene * {
+    animation: none !important;
+  }
+  .saathi-sig-green,
+  .saathi-bubble {
+    opacity: 1;
+  }
+  .saathi-sig-red {
+    opacity: 0.15;
+  }
+  .saathi-gate-arm {
+    transform: rotate(0deg);
+  }
+}

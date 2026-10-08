@@ -48,3 +48,10 @@ Newest last. Each entry: date, decision, reason.
 - **Sign-out redirect** is driven by a `signedOut` flag in auth state, not `navigate()`. Clearing the user unmounts the dashboard first, and router navigations run as transitions, so a `navigate('/')` loses to the guard's redirect to `/signin`.
 - **Tailwind v4 shared classes** (`btn-*`, `field-*`) are declared with `@utility`. Classes in `@layer components` can't be `@apply`-ed into each other in v4.
 - **Journey dates are formatted by hand** ("Fri, 9 Oct 2026"), because `Intl` output differs between ICU versions (browser vs Node).
+
+## 2026-10-08: Demo seed and Saathi mascot (ahead of Phase 6)
+
+- **`npm run seed`** creates or resets a demo account with three sample journeys (today, tomorrow, in 5 days). The credentials live in `DEMO_ACCOUNT` in `server/src/db/seed.ts`, not in chat or docs. They're local-only and refused under `NODE_ENV=production`. Re-seeding resets the password and journeys and signs out existing demo sessions.
+- **Saathi** is the assistant's name and mascot: an anime-style (chibi) red electric locomotive with big eyes, idling at a level crossing. It's hand-written inline SVG plus CSS keyframes, with no animation library. One 10-second loop syncs the signal (red, yellow, green), the crossing gate and lights, the headlight beam, and a "Namaste!" bubble with sparkles. Blinking, idle "breathing", a pantograph spark, a drifting cloud and a rail glint run independently. Under `prefers-reduced-motion` it's a still frame.
+- **Assistant widget shell.** A launcher on every page (Saathi's face) opens a non-modal chat panel (Escape closes, focus returns to the launcher). The message box is disabled and the copy says plainly it isn't connected yet. It doesn't fake answers. The real chat (Phase 6) needs the train-data provider (Phase 4) first.
+- **CSS `transform-box: fill-box`** is limited to the animated `.saathi-*` elements. Applied to every SVG child, it moved the pivot of static `transform="rotate()"` shapes.
