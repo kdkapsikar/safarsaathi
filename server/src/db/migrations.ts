@@ -135,4 +135,24 @@ export const migrations: Migration[] = [
       CREATE INDEX chat_messages_session_created ON chat_messages(chat_session_id, created_at);
     `,
   },
+  {
+    id: 2,
+    name: 'assistant_proposals',
+    sql: /* sql */ `
+      -- Write actions the assistant proposes. Nothing happens until the user
+      -- clicks Confirm in the UI; the server then runs the stored payload.
+      CREATE TABLE assistant_proposals (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind         TEXT NOT NULL CHECK (kind IN ('CREATE_JOURNEY', 'DELETE_JOURNEY')),
+        payload_json TEXT NOT NULL,
+        summary      TEXT NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'PENDING'
+                     CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED')),
+        created_at   TEXT NOT NULL,
+        expires_at   TEXT NOT NULL
+      );
+      CREATE INDEX assistant_proposals_user ON assistant_proposals(user_id, created_at DESC);
+    `,
+  },
 ];

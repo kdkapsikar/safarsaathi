@@ -2,7 +2,7 @@
 
 Proactive train alerts for Indian Railways passengers and the people waiting for them.
 
-> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), the SQLite database, auth API and data-access layer (Phase 2), sign-up, sign-in and the journeys dashboard (Phase 3), live train data with a simulator (Phase 4), and the alert engine with an in-app notification bell (Phase 5).
+> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), the SQLite database, auth API and data-access layer (Phase 2), sign-up, sign-in and the journeys dashboard (Phase 3), live train data with a simulator (Phase 4), the alert engine with an in-app notification bell (Phase 5), and Saathi, the website assistant that answers from live data (Phase 6).
 
 ## Requirements
 
@@ -51,6 +51,13 @@ The database is created and migrated automatically at `data/safar-saathi.db` on 
 ## Switching Node versions
 
 `better-sqlite3` is a native module built for one Node version. `npm run dev` and `npm test` check it first and rebuild it automatically if you've switched Node (nvm, Homebrew, etc.).
+
+## Saathi, the assistant
+
+Saathi (the round button at the bottom right of every page) answers questions about trains using **tools** that read the same live data as the rest of the app: `get_live_status`, `get_schedule`, `get_platform_info`, `trains_between` and `site_help` for everyone, plus `list_my_journeys`, `get_journey_status`, `create_journey` and `delete_journey` when signed in. It always says when the data is from ("as of …") and says so when data is unavailable, rather than guessing. Adding or deleting a journey is only ever a **proposal**: nothing changes until you press Confirm on the card.
+
+- **No API key (default):** an offline "basic mode" assistant matches common questions and calls the same tools. Good for previews.
+- **Real assistant:** put `ANTHROPIC_API_KEY=...` in `.env` (never commit it). `ASSISTANT_MODEL` in `.env.example` sets the model. Limits, effort and the daily token cap are in `.env.example` too.
 
 ## Configuration
 

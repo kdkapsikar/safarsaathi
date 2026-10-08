@@ -3,6 +3,7 @@ import { migrate, openDatabase } from '../src/db/index.js';
 
 const EXPECTED_TABLES = [
   'alert_rules',
+  'assistant_proposals',
   'chat_messages',
   'chat_sessions',
   'journeys',

@@ -59,6 +59,18 @@ export interface ChatSession {
   updatedAt: string;
 }
 
+export type ProposalKind = 'CREATE_JOURNEY' | 'DELETE_JOURNEY';
+
+export interface Proposal {
+  id: string;
+  kind: ProposalKind;
+  payload: unknown;
+  summary: string;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'tool';
@@ -388,7 +400,71 @@ export function createUserData(db: Db, userId: string) {
     },
   };
 
-  return { userId, journeys, alertRules, recipients, notifications, chat };
+  /* eslint-disable @typescript-eslint/no-explicit-any -- raw SQLite rows */
+  const toProposal = (r: any): Proposal => ({
+    id: r.id,
+    kind: r.kind,
+    payload: JSON.parse(r.payload_json),
+    summary: r.summary,
+    status: r.status,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+  });
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  const proposals = {
+    create(kind: ProposalKind, payload: unknown, summary: string, ttlMinutes = 30): Proposal {
+      const now = new Date();
+      const row = {
+        id: newId(),
+        kind,
+        payload_json: JSON.stringify(payload),
+        summary,
+        status: 'PENDING',
+        created_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + ttlMinutes * 60_000).toISOString(),
+      };
+      db.prepare(
+        `INSERT INTO assistant_proposals (id, user_id, kind, payload_json, summary, status, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        row.id,
+        userId,
+        row.kind,
+        row.payload_json,
+        row.summary,
+        row.status,
+        row.created_at,
+        row.expires_at,
+      );
+      return toProposal(row);
+    },
+
+    /** A pending, unexpired proposal of this user's, or null. */
+    getPending(proposalId: string, now = new Date()): Proposal | null {
+      const r = db
+        .prepare(
+          `SELECT * FROM assistant_proposals
+           WHERE id = ? AND user_id = ? AND status = 'PENDING' AND expires_at > ?`,
+        )
+        .get(proposalId, userId, now.toISOString());
+      return r ? toProposal(r) : null;
+    },
+
+    /** Moves a pending proposal to CONFIRMED/CANCELLED; false if it wasn't pending or isn't mine. */
+    resolve(proposalId: string, status: 'CONFIRMED' | 'CANCELLED'): boolean {
+      return (
+        db
+          .prepare(
+            `UPDATE assistant_proposals SET status = ?
+             WHERE id = ? AND user_id = ? AND status = 'PENDING'`,
+          )
+          .run(status, proposalId, userId).changes > 0
+      );
+    },
+  };
+
+  return { userId, journeys, alertRules, recipients, notifications, chat, proposals };
 }
 
 export type UserData = ReturnType<typeof createUserData>;

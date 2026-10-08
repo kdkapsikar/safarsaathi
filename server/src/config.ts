@@ -60,12 +60,31 @@ const envSchema = z.object({
   ALERT_ENGINE_CRON: z.string().default('* * * * *'),
   /** Email delivery. Only 'dry-run' (log what would be sent) exists so far; 'off' disables email. */
   EMAIL_MODE: z.enum(['dry-run', 'off']).default('dry-run'),
+
+  /** Website assistant. Without a key, an offline scripted assistant runs instead. */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Model ID from env only, never hard-coded. Required when ANTHROPIC_API_KEY is set. */
+  ASSISTANT_MODEL: z.string().min(1).optional(),
+  ASSISTANT_EFFORT: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('low'),
+  ASSISTANT_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
+  ASSISTANT_MAX_TOOL_ROUNDS: z.coerce.number().int().min(1).max(10).default(5),
+  /** If the model declines a request, let the API retry it on a fallback model. */
+  ASSISTANT_REFUSAL_FALLBACK: booleanString.default(true),
+  ASSISTANT_USER_HOURLY_LIMIT: z.coerce.number().int().positive().default(40),
+  ASSISTANT_IP_HOURLY_LIMIT: z.coerce.number().int().positive().default(20),
+  /** Daily cost cap, as input + output tokens across all users. Past it, the offline assistant answers. */
+  ASSISTANT_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(2_000_000),
+  /** How many earlier turns the assistant sees. */
+  ASSISTANT_HISTORY_TURNS: z.coerce.number().int().min(0).max(30).default(8),
 });
 
 export type Config = z.infer<typeof envSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const config = envSchema.parse(env);
+  if (config.ANTHROPIC_API_KEY && !config.ASSISTANT_MODEL) {
+    throw new Error('ASSISTANT_MODEL is required when ANTHROPIC_API_KEY is set');
+  }
   if (config.TRAIN_PROVIDER === 'http' && !config.TRAIN_API_BASE_URL) {
     throw new Error('TRAIN_API_BASE_URL is required when TRAIN_PROVIDER=http');
   }

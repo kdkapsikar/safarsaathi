@@ -6,7 +6,7 @@ import { Brand } from '../components/Brand';
 import { JourneyForm } from '../components/JourneyForm';
 import { JourneyList } from '../components/JourneyList';
 import { NotificationBell } from '../components/NotificationBell';
-import { api, type Journey } from '../lib/api';
+import { api, JOURNEYS_CHANGED, type Journey } from '../lib/api';
 
 type Load = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ready' };
 
@@ -38,7 +38,11 @@ export function Dashboard() {
       );
   }, []);
 
-  useEffect(fetchJourneys, [fetchJourneys]);
+  useEffect(() => {
+    fetchJourneys();
+    window.addEventListener(JOURNEYS_CHANGED, fetchJourneys);
+    return () => window.removeEventListener(JOURNEYS_CHANGED, fetchJourneys);
+  }, [fetchJourneys]);
 
   const create = async (input: CreateJourneyInput) => {
     const { journey } = await api.createJourney(input);

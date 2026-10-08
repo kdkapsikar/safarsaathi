@@ -95,6 +95,27 @@ export type ClockAction =
   | { action: 'reset' }
   | { action: 'beforeDeparture'; trainNumber: string; startDate?: string; minutes: number };
 
+export interface ProposalView {
+  id: string;
+  kind: 'CREATE_JOURNEY' | 'DELETE_JOURNEY';
+  summary: string;
+  expiresAt: string;
+}
+
+export type ChatEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'tool'; name: string; status: 'start' | 'done' | 'error' }
+  | { type: 'proposal'; proposal: ProposalView }
+  | { type: 'notice'; message: string }
+  | { type: 'done'; sessionId: string | null; mode: 'claude' | 'offline' }
+  | { type: 'error'; message: string };
+
+export interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  proposals?: ProposalView[];
+}
+
 export interface HealthResponse {
   status: 'ok';
   service: string;
@@ -182,6 +203,14 @@ export const api = {
     request<{ marked: number }>('/api/notifications/read-all', { method: 'POST' }),
   runAlerts: () => request<SimulatorState>('/api/simulator/run-alerts', { method: 'POST' }),
 
+  chatInfo: () => request<{ mode: 'claude' | 'offline'; signedIn: boolean }>('/api/chat/info'),
+  chatHistory: () =>
+    request<{ sessionId: string | null; messages: ChatHistoryMessage[] }>('/api/chat/history'),
+  confirmProposal: (id: string) =>
+    request<{ result: string }>(`/api/chat/proposals/${id}/confirm`, { method: 'POST' }),
+  cancelProposal: (id: string) =>
+    request<void>(`/api/chat/proposals/${id}/cancel`, { method: 'POST' }),
+
   simulator: () => request<SimulatorState>('/api/simulator'),
   setScenario: (trainNumber: string, scenario: string) =>
     request<SimulatorState>('/api/simulator/scenario', json({ trainNumber, scenario })),
@@ -193,3 +222,61 @@ export const api = {
 /** Fired after any simulator change so live views refresh straight away. */
 export const SIMULATOR_CHANGED = 'safar:simulator-changed';
 export const notifySimulatorChanged = () => window.dispatchEvent(new Event(SIMULATOR_CHANGED));
+
+/** Fired when journeys change outside the dashboard form (e.g. confirmed in the assistant). */
+export const JOURNEYS_CHANGED = 'safar:journeys-changed';
+export const notifyJourneysChanged = () => window.dispatchEvent(new Event(JOURNEYS_CHANGED));
+
+/**
+ * Sends a chat message and calls `onEvent` for each server-sent event as it
+ * arrives. Rejects with ApiError for non-streaming errors (400, 429).
+ */
+export async function streamChat(
+  body: {
+    message: string;
+    sessionId?: string;
+    history?: { role: 'user' | 'assistant'; text: string }[];
+  },
+  onEvent: (e: ChatEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch('/api/chat', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    throw new ApiError(0, 'NETWORK', "Can't reach Safar Saathi. Check your connection.");
+  }
+  if (!res.ok || !res.body) {
+    const e = (
+      (await res.json().catch(() => null)) as { error?: { code: string; message: string } } | null
+    )?.error;
+    throw new ApiError(
+      res.status,
+      e?.code ?? 'HTTP_ERROR',
+      e?.message ?? `Request failed (HTTP ${res.status})`,
+    );
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    let cut: number;
+    while ((cut = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, cut);
+      buffer = buffer.slice(cut + 2);
+      const data = block.split('\n').find((l) => l.startsWith('data: '));
+      if (data) onEvent(JSON.parse(data.slice(6)) as ChatEvent);
+    }
+    if (done) break;
+  }
+}

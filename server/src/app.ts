@@ -4,11 +4,14 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { sessionPlugin } from './auth/sessions.js';
 import { simulatorEnabled, type Config } from './config.js';
 import { AlertEngine } from './alerts/engine.js';
+import { AssistantService } from './assistant/service.js';
+import type { AssistantEngine } from './assistant/types.js';
 import { DryRunEmailChannel, InAppChannel } from './alerts/channels.js';
 import { createDataAccess, type DataAccess } from './data/index.js';
 import { createEngineStore } from './data/engineStore.js';
 import type { Db } from './db/index.js';
 import { authRoutes } from './routes/auth.js';
+import { chatRoutes } from './routes/chat.js';
 import { healthRoutes } from './routes/health.js';
 import { journeyRoutes } from './routes/journeys.js';
 import { notificationRoutes } from './routes/notifications.js';
@@ -23,6 +26,7 @@ declare module 'fastify' {
     data: DataAccess;
     trains: TrainServices;
     alerts: AlertEngine;
+    assistant: AssistantService;
   }
 }
 
@@ -31,12 +35,15 @@ export interface AppDeps {
   db: Db;
   /** Override for tests; built from config otherwise. */
   trains?: TrainServices;
+  /** Override for tests (e.g. Claude with a mocked client). */
+  assistantEngine?: AssistantEngine;
 }
 
 export async function buildApp({
   config,
   db,
   trains: trainsOverride,
+  assistantEngine,
 }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.LOG_LEVEL }, bodyLimit: 64 * 1024 });
   const data = createDataAccess(db);
@@ -55,6 +62,16 @@ export async function buildApp({
   });
   app.decorate('alerts', alerts);
   app.addHook('onClose', async () => alerts.stop());
+
+  const clock = trains.simulator?.clock ?? systemClock;
+  const assistant = new AssistantService({
+    config,
+    data,
+    provider: trains.provider,
+    clock,
+    engine: assistantEngine,
+  });
+  app.decorate('assistant', assistant);
 
   app.setErrorHandler((err: FastifyError, request, reply) => {
     const status = err.statusCode ?? 500;
@@ -82,6 +99,7 @@ export async function buildApp({
   await app.register(authRoutes, { prefix: '/api/auth', data, config });
   await app.register(journeyRoutes, { prefix: '/api/journeys' });
   await app.register(notificationRoutes, { prefix: '/api/notifications' });
+  await app.register(chatRoutes, { prefix: '/api/chat', assistant, clock });
   await app.register(trainRoutes, { prefix: '/api/trains', trains });
   if (trains.simulator && simulatorEnabled(config)) {
     await app.register(simulatorRoutes, {
