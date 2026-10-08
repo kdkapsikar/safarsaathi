@@ -12,11 +12,13 @@
     "node": ">=20.19.0"
   },
   "scripts": {
+    "predev": "node scripts/ensure-native.mjs",
     "dev": "concurrently --names api,web --prefix-colors cyan,magenta --kill-others-on-fail \"npm run dev -w server\" \"npm run dev -w web\"",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck --workspaces",
+    "pretest": "node scripts/ensure-native.mjs",
     "test": "npm run test --workspaces"
   },
   "devDependencies": {
@@ -31,5 +33,8 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
   }
 }

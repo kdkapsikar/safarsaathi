@@ -22,3 +22,17 @@ Newest last. Each entry: date, decision, reason.
 - **API settings use `API_PORT` / `API_HOST`, not `PORT` / `HOST`.** Preview tools and hosts set `PORT` for the web server, and the API must not pick it up.
 - **Vite proxies `/api`** to the API, so the browser sees one origin. That keeps cookie sessions same-site in Phase 2.
 - **Moved `RailAlerts-ClaudeCode-Prompts.md` to `reference/`.** It's an older plan for a Next.js + Supabase stack that this project doesn't use.
+
+## 2026-10-08: Phase 2: database, auth and authorization
+
+- **better-sqlite3 pinned to 12.11.x.** 13.x needs Node 22+. Its install script is approved via npm's `allowScripts`, because npm 11 blocks install scripts by default.
+- **`@node-rs/argon2` for argon2id hashing**, with library defaults (OWASP baseline). It ships prebuilt binaries, so it needs no install script or compiler.
+- **Native-module guard.** `scripts/ensure-native.mjs` runs before `dev` and `test` and rebuilds better-sqlite3 if the current Node can't load it. This machine has Node 26 (Homebrew) and Node 24 (nvm), and the preview pane uses Node 24.
+- **Migrations are TypeScript strings**, in an append-only array tracked in `schema_migrations`. There are no SQL files to copy at build time.
+- **Sessions.** A random 256-bit token goes in an HTTP-only `SameSite=Lax` cookie. Only its SHA-256 is stored, so a leaked DB can't be replayed. Logout deletes the row server-side. `Secure` is enabled with `COOKIE_SECURE=true`.
+- **CSRF (moved up from Phase 8).** Three layers: SameSite=Lax; JSON-only bodies (form posts get 415); and an `onRequest` check rejecting non-GET requests with `Sec-Fetch-Site: cross-site` or an Origin outside `APP_ORIGINS`.
+- **Login doesn't reveal which emails exist.** Wrong password and unknown email give the same 401, with a dummy argon2 check to equalise timing. Registration does say "email already registered" (409), a deliberate UX trade-off, mitigated by rate limiting.
+- **Data-access layer shape.** `data.forUser(userId)` returns an object whose every query is bound to that user, directly or via the owning journey/chat session. Routes and (later) assistant tools can only get user data through it, with the id taken from the session. Someone else's row looks the same as a missing row (`null`/`false`, so 404, not 403). `data.accounts` holds the only unscoped lookups: login and session resolution.
+- **notification_log dedupe** is a unique expression index on `(journey_id, COALESCE(recipient_id, ''), event_key)`. SQLite treats NULLs as distinct, and `recipient_id` is NULL for the journey owner.
+- **Alert-rule types** are DEPARTURE, ARRIVAL, DELAY and PLATFORM_CHANGE. Cancellation and diversion alerts always go out, so they have no rule row.
+- **`.gitignore` rules anchored to the root** (`/data/`, `/reference/`). Unanchored `data/` was also hiding `server/src/data/`.

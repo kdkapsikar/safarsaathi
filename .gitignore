@@ -10,10 +10,10 @@ coverage/
 !.env.example
 
 # Local data (SQLite database files)
-data/
+/data/
 
 # Read-only reference material from the earlier version
-reference/
+/reference/
 
 # Test output
 playwright-report/
