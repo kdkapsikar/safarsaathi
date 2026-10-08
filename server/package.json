@@ -21,5 +21,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "tsx": "^4.23.15"
+  },
+  "exports": {
+    "./schemas": "./src/schemas/index.ts"
   }
 }

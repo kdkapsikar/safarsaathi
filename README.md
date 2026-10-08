@@ -2,7 +2,7 @@
 
 Proactive train alerts for Indian Railways passengers and the people waiting for them.
 
-> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), and the SQLite database, auth API and data-access layer (Phase 2).
+> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), the SQLite database, auth API and data-access layer (Phase 2), and sign-up, sign-in and the journeys dashboard (Phase 3).
 
 ## Requirements
 
@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The landing page calls `GET /api/health` and shows **API is up**.
+Open http://localhost:5173, create an account, and add a journey from the dashboard. The landing page footer shows whether the API is running.
 
 | Command             | What it does                                                                                            |
 | ------------------- | ------------------------------------------------------------------------------------------------------- |

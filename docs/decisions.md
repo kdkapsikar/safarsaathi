@@ -36,3 +36,15 @@ Newest last. Each entry: date, decision, reason.
 - **notification_log dedupe** is a unique expression index on `(journey_id, COALESCE(recipient_id, ''), event_key)`. SQLite treats NULLs as distinct, and `recipient_id` is NULL for the journey owner.
 - **Alert-rule types** are DEPARTURE, ARRIVAL, DELAY and PLATFORM_CHANGE. Cancellation and diversion alerts always go out, so they have no rule row.
 - **`.gitignore` rules anchored to the root** (`/data/`, `/reference/`). Unanchored `data/` was also hiding `server/src/data/`.
+
+## 2026-10-08: Phase 3: dashboard UI
+
+- **Shared validation.** `server/src/schemas` is exported as `@safar-saathi/server/schemas`, and `web/` depends on it as a workspace package. Client and server parse with the same zod schemas, so the rules can't drift. That folder must stay free of Node-only APIs because it ships to the browser.
+- **Journey date rules** (`journeyDateProblem`): from yesterday (a train that left last night may still be running) up to 120 days ahead, using the IST calendar date. Checked in the form and again on the server.
+- **"Journeys" is the user-facing word**, with alert types as badges on each journey (default 7).
+- **react-router 7**, not 8, because 8 needs Node 22+.
+- **Stations list** is a bundled sample of 127 major stations for autocomplete (`web/src/data/stations.json`). Any 1-5 letter code can still be typed by hand. The full list should come from the train-data provider later.
+- **Autocomplete** follows the WAI-ARIA 1.2 combobox pattern. The delete confirmation is a custom `alertdialog` with focus trap and Escape, because jsdom can't test native `<dialog>.showModal()`.
+- **Sign-out redirect** is driven by a `signedOut` flag in auth state, not `navigate()`. Clearing the user unmounts the dashboard first, and router navigations run as transitions, so a `navigate('/')` loses to the guard's redirect to `/signin`.
+- **Tailwind v4 shared classes** (`btn-*`, `field-*`) are declared with `@utility`. Classes in `@layer components` can't be `@apply`-ed into each other in v4.
+- **Journey dates are formatted by hand** ("Fri, 9 Oct 2026"), because `Intl` output differs between ICU versions (browser vs Node).

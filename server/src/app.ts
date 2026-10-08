@@ -7,6 +7,7 @@ import { createDataAccess, type DataAccess } from './data/index.js';
 import type { Db } from './db/index.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
+import { journeyRoutes } from './routes/journeys.js';
 import { originCheck } from './security/origin.js';
 
 declare module 'fastify' {
@@ -49,6 +50,7 @@ export async function buildApp({ config, db }: AppDeps): Promise<FastifyInstance
 
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth', data, config });
+  await app.register(journeyRoutes, { prefix: '/api/journeys' });
 
   return app;
 }

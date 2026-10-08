@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { Db } from '../db/index.js';
+import { ALERT_TYPES } from '../schemas/journey.js';
 import type {
   AddRecipientInput,
   AlertType,
@@ -75,7 +76,11 @@ const toJourney = (r: any): Journey => ({
   toStationName: r.to_station_name,
   journeyDate: r.journey_date,
   status: r.status,
-  alertTypes: r.alert_types ? (r.alert_types as string).split(',').sort() as AlertType[] : [],
+  alertTypes: r.alert_types
+    ? ((r.alert_types as string).split(',') as AlertType[]).sort(
+        (a, b) => ALERT_TYPES.indexOf(a) - ALERT_TYPES.indexOf(b),
+      )
+    : [],
   createdAt: r.created_at,
 });
 const toRule = (r: any): AlertRule => ({

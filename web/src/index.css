@@ -12,8 +12,39 @@
   --color-saffron: #f2b134;
   --color-ok: #1f7a4d;
   --color-bad: #b42318;
+
+  --color-badge-departure: #dcebe8;
+  --color-badge-departure-ink: #0f3d3e;
+  --color-badge-arrival: #e3e8f8;
+  --color-badge-arrival-ink: #23376b;
+  --color-badge-delay: #fcefd2;
+  --color-badge-delay-ink: #7a4b00;
+  --color-badge-platform: #efe5f7;
+  --color-badge-platform-ink: #55276f;
 }
 
 body {
   @apply bg-paper text-ink font-sans antialiased;
+}
+
+@utility field-label {
+  @apply mb-1.5 block text-sm font-medium;
+}
+@utility field-input {
+  @apply block w-full rounded-xl border border-line bg-card px-3 py-2.5 text-base outline-none transition-colors placeholder:text-muted/70 focus:border-teal focus:ring-2 focus:ring-teal/20 aria-invalid:border-bad aria-invalid:ring-bad/15;
+}
+@utility field-error {
+  @apply mt-1 text-sm font-medium text-bad;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-saffron disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-teal text-white hover:bg-teal/90;
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-card text-ink hover:bg-paper;
+}
+@utility btn-danger {
+  @apply btn bg-bad text-white hover:bg-bad/90;
 }
