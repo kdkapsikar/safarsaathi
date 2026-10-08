@@ -34,5 +34,6 @@ export function createTrainServices(config: Config): TrainServices {
 }
 
 export * from './types.js';
+export { resolveStartDate } from './startDate.js';
 export { ResilientProvider } from './resilient.js';
 export { MockProvider, SimClock } from './mock/MockProvider.js';

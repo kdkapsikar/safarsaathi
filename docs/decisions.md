@@ -69,3 +69,18 @@ Newest last. Each entry: date, decision, reason.
 - **Train endpoints are public** (rate-limited at 120/min per IP). The assistant's anonymous "public tools" will use the same data.
 - **Journey cards show live status** (a small extension of the Phase-4 brief, so the simulator's effect is visible): headline, boarding-station departure and platform, last station, note, and "as of". They poll every 30 s and refresh instantly on a `safar:simulator-changed` window event.
 - **Known limitation**: a journey's date is treated as the train's start date. Deriving the start date for mid-route boarding on a later day is left to Phase 5 (documented in data-source.md).
+
+## 2026-10-08: Phase 5: alert engine and notifications
+
+- **Level-triggered events with stable keys.** `deriveEvents()` looks at the current status and emits every alert-worthy fact with a key (`DELAY:60`, `PLATFORM:MMCT:5`, `DEPARTED:MMCT`, `CANCELLED`…). `notification_log`'s unique index on (journey, recipient, key) makes delivery idempotent. A missed run never loses an alert, and repeated or concurrent runs never duplicate one. The previous snapshot is used only to describe changes ("was 3").
+- **Delay alerts** fire at the journey's threshold (default 15 min), then at 30/60/90/120/180/240 above it. They watch the boarding station until departure, then the destination.
+- **Cancellation and diversion** need no rule, ignore quiet hours, and go out by email too if any of the journey's rules use email.
+- **Quiet hours** (IST, can cross midnight) skip without logging, so a still-true alert goes out once they end. A departure is only "news" for 60 min.
+- **Start date for mid-route boarding.** Journeys keep the boarding date; `resolveStartDate()` maps it to the run's start date using the schedule (day N stop → minus N-1 days). The engine and `/api/trains/:n/status?boardingStation=` both use it, which fixes the Phase 4 known limitation.
+- **Active window**: from 6 h before boarding to 6 h after scheduled arrival. Candidates come from boarding dates in [today-3, today+1].
+- **Adaptive polling** per train run: 1 min within an hour of any upcoming stop, 5 min while it matters, 15 min if more than 6 h before departure, 30 min after arrival or cancellation. `force` (simulator) ignores it. Guarded against overlapping runs.
+- **The engine's cross-user access is isolated** in `createEngineStore(db)`. It's the only place that reads all users' journeys, it's used only by the engine, and every write goes to that journey's own owner or recipients. Request handlers still only get `data.forUser()`.
+- **`NotificationChannel`**: `InAppChannel` (the `notifications` table behind the bell) and `DryRunEmailChannel` (logs). The log row records channels as `IN_APP+EMAIL`. A failed delivery is marked FAILED and not retried yet.
+- **Snapshots**: only the latest per train run is kept.
+- **node-cron 4** in-process (`noOverlap`), started only by `index.ts` (never in tests). The engine uses the simulator clock when the simulator is on, so stepping time drives alerts. Every simulator change also triggers a forced run.
+- **Recipients are already honoured** by the engine (email, opted-out skipped). Their UI and opt-out links come in Phase 7.

@@ -2,7 +2,7 @@
 
 Proactive train alerts for Indian Railways passengers and the people waiting for them.
 
-> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), the SQLite database, auth API and data-access layer (Phase 2), sign-up, sign-in and the journeys dashboard (Phase 3), and live train data with a simulator (Phase 4).
+> Early development. So far: the monorepo scaffold, a landing page that checks the API (Phase 1), the SQLite database, auth API and data-access layer (Phase 2), sign-up, sign-in and the journeys dashboard (Phase 3), live train data with a simulator (Phase 4), and the alert engine with an in-app notification bell (Phase 5).
 
 ## Requirements
 

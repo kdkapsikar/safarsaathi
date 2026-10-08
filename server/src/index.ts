@@ -11,6 +11,7 @@ const config = loadConfig();
 const db = openDatabase(config.DATABASE_PATH);
 const app = await buildApp({ config, db });
 app.addHook('onClose', async () => db.close());
+if (config.ENABLE_ALERT_ENGINE) app.alerts.start(config.ALERT_ENGINE_CRON);
 
 try {
   await app.listen({ port: config.API_PORT, host: config.API_HOST });

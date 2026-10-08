@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Brand } from '../components/Brand';
 import { JourneyForm } from '../components/JourneyForm';
 import { JourneyList } from '../components/JourneyList';
+import { NotificationBell } from '../components/NotificationBell';
 import { api, type Journey } from '../lib/api';
 
 type Load = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ready' };
@@ -60,6 +61,7 @@ export function Dashboard() {
                 Simulator
               </Link>
             )}
+            <NotificationBell />
             <span className="hidden text-sm text-muted sm:inline">
               Signed in as <span className="font-medium text-ink">{user?.name}</span>
             </span>

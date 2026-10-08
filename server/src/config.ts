@@ -54,6 +54,12 @@ const envSchema = z.object({
   TRAIN_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(30),
   /** Dev-only simulator controls. Defaults to on with the mock provider outside production. */
   ENABLE_SIMULATOR: booleanString.optional(),
+
+  /** Alert engine: runs on this cron schedule inside the API process. */
+  ENABLE_ALERT_ENGINE: booleanString.default(true),
+  ALERT_ENGINE_CRON: z.string().default('* * * * *'),
+  /** Email delivery. Only 'dry-run' (log what would be sent) exists so far; 'off' disables email. */
+  EMAIL_MODE: z.enum(['dry-run', 'off']).default('dry-run'),
 });
 
 export type Config = z.infer<typeof envSchema>;

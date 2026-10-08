@@ -27,7 +27,7 @@ export function LiveStatus({ trainNumber, date, boardingCode }: Props) {
   const refresh = useCallback(
     (signal?: AbortSignal) => {
       api
-        .trainStatus(trainNumber, date, signal)
+        .trainStatus(trainNumber, date, signal, boardingCode)
         .then(({ status }) => setLoad({ kind: 'ok', status }))
         .catch((err: unknown) => {
           if (signal?.aborted) return;
@@ -38,7 +38,7 @@ export function LiveStatus({ trainNumber, date, boardingCode }: Props) {
           );
         });
     },
-    [trainNumber, date],
+    [trainNumber, date, boardingCode],
   );
 
   useEffect(() => {

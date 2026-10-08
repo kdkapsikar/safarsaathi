@@ -9,8 +9,8 @@ import type { AlertType } from '../schemas/journey.js';
  */
 export const DEMO_ACCOUNT = {
   name: 'Demo Traveller',
-  email: 'demo@safarsaathi.test',
-  password: 'chai-and-chaat-2026',
+  email: 'demo',
+  password: 'chai@2026',
 } as const;
 
 const sampleJourneys = (now: Date) => [

@@ -295,6 +295,12 @@ export function createUserData(db: Db, userId: string) {
       ).n;
     },
 
+    markAllRead(): number {
+      return db
+        .prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL')
+        .run(nowIso(), userId).changes;
+    },
+
     markRead(notificationId: string): boolean {
       return (
         db

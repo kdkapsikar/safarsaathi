@@ -8,7 +8,7 @@ import { LiveStatus } from './LiveStatus';
 
 afterEach(() => vi.unstubAllGlobals());
 
-const URL = 'GET /api/trains/12951/status?date=2026-10-09';
+const URL = 'GET /api/trains/12951/status?date=2026-10-09&boardingStation=MMCT';
 const renderIt = () =>
   render(<LiveStatus trainNumber="12951" date="2026-10-09" boardingCode="MMCT" />);
 

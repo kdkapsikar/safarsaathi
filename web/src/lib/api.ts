@@ -51,7 +51,30 @@ export interface TrainStatus {
 
 export type SourceHealth = 'HEALTHY' | 'SLOW' | 'DOWN';
 
+export interface AppNotification {
+  id: string;
+  journeyId: string | null;
+  eventKey: string;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface AlertRunSummary {
+  ranAt: string;
+  journeysConsidered: number;
+  trainRuns: number;
+  statusFetches: number;
+  events: number;
+  notificationsSent: number;
+  duplicatesSkipped: number;
+  quietHoursSkipped: number;
+  errors: string[];
+}
+
 export interface SimulatorState {
+  alertRun: AlertRunSummary | null;
   now: string;
   offsetMinutes: number;
   health: SourceHealth;
@@ -136,11 +159,28 @@ export const api = {
     request<{ journey: Journey }>('/api/journeys', json(body)),
   deleteJourney: (id: string) => request<void>(`/api/journeys/${id}`, { method: 'DELETE' }),
 
-  trainStatus: (trainNumber: string, date: string, signal?: AbortSignal) =>
+  /** With `boardingStation`, `date` is the boarding date and the server finds the right run. */
+  trainStatus: (
+    trainNumber: string,
+    date: string,
+    signal?: AbortSignal,
+    boardingStation?: string,
+  ) =>
     request<{ status: TrainStatus }>(
-      `/api/trains/${trainNumber}/status?date=${encodeURIComponent(date)}`,
+      `/api/trains/${trainNumber}/status?date=${encodeURIComponent(date)}` +
+        (boardingStation ? `&boardingStation=${encodeURIComponent(boardingStation)}` : ''),
       { signal },
     ),
+
+  notifications: (signal?: AbortSignal) =>
+    request<{ notifications: AppNotification[]; unreadCount: number }>('/api/notifications', {
+      signal,
+    }),
+  markNotificationRead: (id: string) =>
+    request<void>(`/api/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: () =>
+    request<{ marked: number }>('/api/notifications/read-all', { method: 'POST' }),
+  runAlerts: () => request<SimulatorState>('/api/simulator/run-alerts', { method: 'POST' }),
 
   simulator: () => request<SimulatorState>('/api/simulator'),
   setScenario: (trainNumber: string, scenario: string) =>

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { istDate } from '../schemas/dates.js';
+import type { AlertEngine, RunSummary } from '../alerts/engine.js';
 import type { MockProvider, ResilientProvider } from '../trains/index.js';
 import { SCENARIO_IDS, SCENARIOS } from '../trains/mock/scenarios.js';
 
@@ -28,10 +29,18 @@ const healthBody = z.object({ health: z.enum(['HEALTHY', 'SLOW', 'DOWN']) });
 export const simulatorRoutes: FastifyPluginAsync<{
   simulator: MockProvider;
   provider: ResilientProvider;
-}> = async (app, { simulator, provider }) => {
+  alerts: AlertEngine;
+}> = async (app, { simulator, provider, alerts }) => {
   const bad = (message: string) => ({ error: { code: 'VALIDATION', message } });
 
-  const snapshot = () => ({
+  /** After every simulator change, check alerts straight away rather than waiting for cron. */
+  const changed = async () => {
+    provider.invalidate();
+    return snapshot(await alerts.runOnce({ force: true }));
+  };
+
+  const snapshot = (alertRun: RunSummary | null = alerts.lastRun) => ({
+    alertRun,
     now: simulator.clock.now().toISOString(),
     offsetMinutes: simulator.clock.offsetMinutes,
     health: simulator.health,
@@ -54,8 +63,7 @@ export const simulatorRoutes: FastifyPluginAsync<{
     const ok = simulator.setScenario(body.data.trainNumber, body.data.scenario as never);
     if (!ok)
       return reply.code(404).send(bad(`The simulator has no train ${body.data.trainNumber}.`));
-    provider.invalidate();
-    return snapshot();
+    return changed();
   });
 
   app.post('/clock', async (request, reply) => {
@@ -69,15 +77,15 @@ export const simulatorRoutes: FastifyPluginAsync<{
       if (!at) return reply.code(404).send(bad(`The simulator has no train ${b.trainNumber}.`));
       simulator.clock.set(at);
     }
-    provider.invalidate();
-    return snapshot();
+    return changed();
   });
+
+  app.post('/run-alerts', async () => snapshot(await alerts.runOnce({ force: true })));
 
   app.post('/health', async (request, reply) => {
     const body = healthBody.safeParse(request.body);
     if (!body.success) return reply.code(400).send(bad('Invalid health.'));
     simulator.health = body.data.health;
-    provider.invalidate();
-    return snapshot();
+    return changed();
   });
 };

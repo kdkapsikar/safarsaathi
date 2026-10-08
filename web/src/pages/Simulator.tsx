@@ -11,7 +11,7 @@ import {
   type SourceHealth,
   type TrainStatus,
 } from '../lib/api';
-import { formatDelay, formatIstDateTime, istDate, istDateOf } from '../lib/dates';
+import { formatDelay, formatIstDateTime, formatIstTime, istDate, istDateOf } from '../lib/dates';
 
 const STEPS = [
   { label: '+15 min', minutes: 15 },
@@ -167,6 +167,49 @@ export function Simulator() {
                     Reset to now
                   </button>
                 </div>
+              </section>
+
+              <section
+                aria-labelledby="alerts-h"
+                className="rounded-2xl border border-line bg-card p-5"
+              >
+                <h2 id="alerts-h" className="text-sm font-semibold text-muted">
+                  Alert engine
+                </h2>
+                <p className="mt-1 text-sm text-muted">
+                  Runs every minute, and straight after each change here.
+                </p>
+                {sim.alertRun ? (
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm" aria-live="polite">
+                    <dt className="text-muted">Last run (sim time)</dt>
+                    <dd className="text-right tabular-nums">{formatIstTime(sim.alertRun.ranAt)}</dd>
+                    <dt className="text-muted">Journeys checked</dt>
+                    <dd className="text-right tabular-nums">{sim.alertRun.journeysConsidered}</dd>
+                    <dt className="text-muted">Status fetches</dt>
+                    <dd className="text-right tabular-nums">{sim.alertRun.statusFetches}</dd>
+                    <dt className="text-muted">Alerts sent</dt>
+                    <dd className="text-right font-semibold tabular-nums">
+                      {sim.alertRun.notificationsSent}
+                    </dd>
+                    <dt className="text-muted">Already sent (skipped)</dt>
+                    <dd className="text-right tabular-nums">{sim.alertRun.duplicatesSkipped}</dd>
+                    <dt className="text-muted">Held for quiet hours</dt>
+                    <dd className="text-right tabular-nums">{sim.alertRun.quietHoursSkipped}</dd>
+                  </dl>
+                ) : (
+                  <p className="mt-3 text-sm text-muted">No run yet.</p>
+                )}
+                {sim.alertRun?.errors.length ? (
+                  <p className="mt-2 text-sm text-bad">{sim.alertRun.errors.join('; ')}</p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void act(() => api.runAlerts())}
+                  className="btn-secondary mt-3 px-3 py-2"
+                >
+                  Run alert check now
+                </button>
               </section>
 
               <section

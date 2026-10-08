@@ -3,20 +3,26 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { sessionPlugin } from './auth/sessions.js';
 import { simulatorEnabled, type Config } from './config.js';
+import { AlertEngine } from './alerts/engine.js';
+import { DryRunEmailChannel, InAppChannel } from './alerts/channels.js';
 import { createDataAccess, type DataAccess } from './data/index.js';
+import { createEngineStore } from './data/engineStore.js';
 import type { Db } from './db/index.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { journeyRoutes } from './routes/journeys.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { simulatorRoutes } from './routes/simulator.js';
 import { trainRoutes } from './routes/trains.js';
 import { originCheck } from './security/origin.js';
 import { createTrainServices, type TrainServices } from './trains/index.js';
+import { systemClock } from './trains/time.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     data: DataAccess;
     trains: TrainServices;
+    alerts: AlertEngine;
   }
 }
 
@@ -37,6 +43,18 @@ export async function buildApp({
   app.decorate('data', data);
   const trains = trainsOverride ?? createTrainServices(config);
   app.decorate('trains', trains);
+
+  const engineStore = createEngineStore(db);
+  const alerts = new AlertEngine({
+    store: engineStore,
+    provider: trains.provider,
+    clock: trains.simulator?.clock ?? systemClock,
+    inApp: new InAppChannel(engineStore),
+    email: config.EMAIL_MODE === 'dry-run' ? new DryRunEmailChannel(app.log) : null,
+    log: app.log,
+  });
+  app.decorate('alerts', alerts);
+  app.addHook('onClose', async () => alerts.stop());
 
   app.setErrorHandler((err: FastifyError, request, reply) => {
     const status = err.statusCode ?? 500;
@@ -63,12 +81,14 @@ export async function buildApp({
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth', data, config });
   await app.register(journeyRoutes, { prefix: '/api/journeys' });
+  await app.register(notificationRoutes, { prefix: '/api/notifications' });
   await app.register(trainRoutes, { prefix: '/api/trains', trains });
   if (trains.simulator && simulatorEnabled(config)) {
     await app.register(simulatorRoutes, {
       prefix: '/api/simulator',
       simulator: trains.simulator,
       provider: trains.provider,
+      alerts,
     });
   }
 

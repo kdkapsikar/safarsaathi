@@ -10,6 +10,7 @@ import { Simulator } from './Simulator';
 afterEach(() => vi.unstubAllGlobals());
 
 const state = (overrides: Partial<SimulatorState> = {}): SimulatorState => ({
+  alertRun: null,
   now: '2026-10-09T10:30:00.000Z',
   offsetMinutes: 0,
   health: 'HEALTHY',

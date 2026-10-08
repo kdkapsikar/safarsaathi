@@ -1,10 +1,18 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { istDate } from '../schemas/dates.js';
-import { ProviderError, type TrainServices } from '../trains/index.js';
+import { ProviderError, resolveStartDate, type TrainServices } from '../trains/index.js';
 
 const trainParams = z.object({ trainNumber: z.string().regex(/^\d{5}$/) });
-const statusQuery = z.object({ date: z.iso.date().optional() });
+const statusQuery = z.object({
+  date: z.iso.date().optional(),
+  /** If given, `date` is the passenger's boarding date at this station, not the train's start date. */
+  boardingStation: z
+    .string()
+    .regex(/^[A-Za-z]{1,5}$/)
+    .transform((s) => s.toUpperCase())
+    .optional(),
+});
 
 export function providerUnavailable(reply: FastifyReply, err: ProviderError) {
   return reply.code(503).send({
@@ -46,7 +54,15 @@ export const trainRoutes: FastifyPluginAsync<{ trains: TrainServices }> = async 
     }
     const { trainNumber } = params.data;
     try {
-      const status = await provider.getLiveStatus(trainNumber, query.data.date ?? istDate());
+      const date = query.data.date ?? istDate();
+      const startDate = query.data.boardingStation
+        ? resolveStartDate(
+            await provider.getSchedule(trainNumber),
+            query.data.boardingStation,
+            date,
+          )
+        : date;
+      const status = await provider.getLiveStatus(trainNumber, startDate);
       return status ? { status } : notFound(reply, trainNumber);
     } catch (err) {
       if (err instanceof ProviderError) return providerUnavailable(reply, err);
