@@ -2,29 +2,41 @@ import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { sessionPlugin } from './auth/sessions.js';
-import type { Config } from './config.js';
+import { simulatorEnabled, type Config } from './config.js';
 import { createDataAccess, type DataAccess } from './data/index.js';
 import type { Db } from './db/index.js';
 import { authRoutes } from './routes/auth.js';
 import { healthRoutes } from './routes/health.js';
 import { journeyRoutes } from './routes/journeys.js';
+import { simulatorRoutes } from './routes/simulator.js';
+import { trainRoutes } from './routes/trains.js';
 import { originCheck } from './security/origin.js';
+import { createTrainServices, type TrainServices } from './trains/index.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     data: DataAccess;
+    trains: TrainServices;
   }
 }
 
 export interface AppDeps {
   config: Config;
   db: Db;
+  /** Override for tests; built from config otherwise. */
+  trains?: TrainServices;
 }
 
-export async function buildApp({ config, db }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  db,
+  trains: trainsOverride,
+}: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.LOG_LEVEL }, bodyLimit: 64 * 1024 });
   const data = createDataAccess(db);
   app.decorate('data', data);
+  const trains = trainsOverride ?? createTrainServices(config);
+  app.decorate('trains', trains);
 
   app.setErrorHandler((err: FastifyError, request, reply) => {
     const status = err.statusCode ?? 500;
@@ -51,6 +63,14 @@ export async function buildApp({ config, db }: AppDeps): Promise<FastifyInstance
   await app.register(healthRoutes, { prefix: '/api' });
   await app.register(authRoutes, { prefix: '/api/auth', data, config });
   await app.register(journeyRoutes, { prefix: '/api/journeys' });
+  await app.register(trainRoutes, { prefix: '/api/trains', trains });
+  if (trains.simulator && simulatorEnabled(config)) {
+    await app.register(simulatorRoutes, {
+      prefix: '/api/simulator',
+      simulator: trains.simulator,
+      provider: trains.provider,
+    });
+  }
 
   return app;
 }

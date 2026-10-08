@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import type { CreateJourneyInput } from '@safar-saathi/server/schemas';
 import { useAuth } from '../auth/AuthContext';
 import { Brand } from '../components/Brand';
@@ -12,6 +13,14 @@ export function Dashboard() {
   const { user, signOut } = useAuth();
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [simulatorOn, setSimulatorOn] = useState(false);
+
+  useEffect(() => {
+    api
+      .simulator()
+      .then(() => setSimulatorOn(true))
+      .catch(() => setSimulatorOn(false));
+  }, []);
 
   const fetchJourneys = useCallback(() => {
     api
@@ -46,6 +55,11 @@ export function Dashboard() {
         <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <Brand />
           <div className="flex items-center gap-3">
+            {simulatorOn && (
+              <Link to="/simulator" className="btn-secondary border-saffron/60 bg-saffron/10">
+                Simulator
+              </Link>
+            )}
             <span className="hidden text-sm text-muted sm:inline">
               Signed in as <span className="font-medium text-ink">{user?.name}</span>
             </span>
@@ -56,7 +70,7 @@ export function Dashboard() {
         </nav>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-8 px-4 py-6 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] md:py-10">
+      <main className="mx-auto grid max-w-6xl gap-8 px-4 pt-6 pb-32 md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] md:pt-10">
         <h1 className="sr-only">Your dashboard</h1>
 
         <section className="h-fit rounded-2xl border border-line bg-card p-5 shadow-sm md:sticky md:top-24 sm:p-6">

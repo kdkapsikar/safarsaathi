@@ -28,10 +28,47 @@ const envSchema = z.object({
 
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+
+  NODE_ENV: z.string().default('development'),
+
+  /** Train data source: the built-in simulator, or an HTTP source (see docs/data-source.md). */
+  TRAIN_PROVIDER: z.enum(['mock', 'http']).default('mock'),
+  TRAIN_API_BASE_URL: z.url().optional(),
+  TRAIN_API_KEY: z.string().optional(),
+  TRAIN_API_KEY_HEADER: z.string().default('x-api-key'),
+  /** What the HTTP source can supply (comma-separated ProviderCapabilities keys). */
+  TRAIN_API_CAPABILITIES: z
+    .string()
+    .default('liveStatus,schedule')
+    .transform((s) =>
+      s
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.enum(['liveStatus', 'schedule', 'platforms', 'coachPosition']))),
+  TRAIN_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  TRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(4000),
+  TRAIN_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  TRAIN_BREAKER_THRESHOLD: z.coerce.number().int().positive().default(5),
+  TRAIN_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(30),
+  /** Dev-only simulator controls. Defaults to on with the mock provider outside production. */
+  ENABLE_SIMULATOR: booleanString.optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  return envSchema.parse(env);
+  const config = envSchema.parse(env);
+  if (config.TRAIN_PROVIDER === 'http' && !config.TRAIN_API_BASE_URL) {
+    throw new Error('TRAIN_API_BASE_URL is required when TRAIN_PROVIDER=http');
+  }
+  return config;
+}
+
+export function simulatorEnabled(config: Config): boolean {
+  return (
+    config.TRAIN_PROVIDER === 'mock' &&
+    (config.ENABLE_SIMULATOR ?? config.NODE_ENV !== 'production')
+  );
 }

@@ -3,6 +3,7 @@ import type { Journey } from '../lib/api';
 import { formatJourneyDate, relativeDateLabel } from '../lib/dates';
 import { ALERT_TYPE_INFO } from './alertTypes';
 import { ConfirmDialog } from './ConfirmDialog';
+import { LiveStatus } from './LiveStatus';
 
 interface Props {
   journeys: Journey[];
@@ -122,6 +123,12 @@ export function JourneyList({ journeys, onDelete, now = () => new Date() }: Prop
                     {label}
                   </span>
                 </div>
+
+                <LiveStatus
+                  trainNumber={j.trainNumber}
+                  date={j.journeyDate}
+                  boardingCode={j.fromStationCode}
+                />
 
                 <ul aria-label="Alerts" className="mt-3 flex flex-wrap gap-1.5">
                   {j.alertTypes.map((t) => (

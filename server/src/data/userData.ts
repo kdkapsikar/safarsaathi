@@ -331,13 +331,21 @@ export function createUserData(db: Db, userId: string) {
     getMessages(chatSessionId: string): ChatMessage[] | null {
       if (!ownsChat(chatSessionId)) return null;
       return db
-        .prepare(
-          'SELECT * FROM chat_messages WHERE chat_session_id = ? ORDER BY created_at, rowid',
-        )
+        .prepare('SELECT * FROM chat_messages WHERE chat_session_id = ? ORDER BY created_at, rowid')
         .all(chatSessionId)
         .map((r) => {
-          const m = r as { id: string; role: ChatMessage['role']; content_json: string; created_at: string };
-          return { id: m.id, role: m.role, content: JSON.parse(m.content_json), createdAt: m.created_at };
+          const m = r as {
+            id: string;
+            role: ChatMessage['role'];
+            content_json: string;
+            created_at: string;
+          };
+          return {
+            id: m.id,
+            role: m.role,
+            content: JSON.parse(m.content_json),
+            createdAt: m.created_at,
+          };
         });
     },
 
@@ -357,7 +365,12 @@ export function createUserData(db: Db, userId: string) {
           userId,
         );
       })();
-      return { id: row.id, role: message.role, content: message.content, createdAt: row.created_at };
+      return {
+        id: row.id,
+        role: message.role,
+        content: message.content,
+        createdAt: row.created_at,
+      };
     },
 
     deleteSession(chatSessionId: string): boolean {

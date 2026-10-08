@@ -1,10 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockApi } from '../test/fetchMock';
 import { fixedNow, journey } from '../test/fixtures';
 import { JourneyList } from './JourneyList';
 
 describe('JourneyList', () => {
+  // Live status lines fetch their own data; no data is fine here.
+  beforeEach(() => mockApi({}));
+  afterEach(() => vi.unstubAllGlobals());
+
   it('shows an empty state', () => {
     render(<JourneyList journeys={[]} onDelete={vi.fn()} />);
     expect(screen.getByText('No journeys yet')).toBeInTheDocument();

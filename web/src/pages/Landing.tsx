@@ -63,7 +63,7 @@ export function Landing() {
         </ul>
       </main>
 
-      <footer className="mx-auto flex w-full max-w-5xl flex-wrap justify-between gap-2 px-4 pb-8 text-sm text-muted">
+      <footer className="mx-auto flex w-full max-w-5xl flex-wrap justify-between gap-2 px-4 pb-28 text-sm text-muted">
         <span>Early preview. Live alerts arrive in upcoming releases.</span>
         <HealthStatus />
       </footer>

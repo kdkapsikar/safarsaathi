@@ -5,6 +5,7 @@ import { AssistantWidget } from './components/assistant/AssistantWidget';
 import { AuthPage } from './pages/AuthPage';
 import { Dashboard } from './pages/Dashboard';
 import { Landing } from './pages/Landing';
+import { Simulator } from './pages/Simulator';
 
 function Loading() {
   return (
@@ -61,6 +62,7 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
+      <Route path="/simulator" element={<Simulator />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

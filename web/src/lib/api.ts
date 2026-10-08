@@ -20,6 +20,58 @@ export interface Journey {
   createdAt: string;
 }
 
+export type StopState = 'UPCOMING' | 'ARRIVED' | 'DEPARTED' | 'SKIPPED';
+
+export interface StationStatus {
+  code: string;
+  name: string;
+  scheduledArrival: string | null;
+  scheduledDeparture: string | null;
+  expectedArrival: string | null;
+  expectedDeparture: string | null;
+  delayMinutes: number;
+  platform: string | null;
+  state: StopState;
+}
+
+export interface TrainStatus {
+  trainNumber: string;
+  trainName: string;
+  startDate: string;
+  state: 'NOT_STARTED' | 'RUNNING' | 'ARRIVED' | 'CANCELLED';
+  currentStation: { code: string; name: string } | null;
+  delayMinutes: number;
+  cancelled: boolean;
+  diverted: boolean;
+  note: string | null;
+  stations: StationStatus[];
+  fetchedAt: string;
+  source: string;
+}
+
+export type SourceHealth = 'HEALTHY' | 'SLOW' | 'DOWN';
+
+export interface SimulatorState {
+  now: string;
+  offsetMinutes: number;
+  health: SourceHealth;
+  scenarios: { id: string; label: string; description: string }[];
+  trains: { trainNumber: string; trainName: string; from: string; to: string; scenario: string }[];
+  stats: {
+    upstreamCalls: number;
+    cacheHits: number;
+    coalesced: number;
+    staleServed: number;
+    failures: number;
+    breaker: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  };
+}
+
+export type ClockAction =
+  | { action: 'advance'; minutes: number }
+  | { action: 'reset' }
+  | { action: 'beforeDeparture'; trainNumber: string; startDate?: string; minutes: number };
+
 export interface HealthResponse {
   status: 'ok';
   service: string;
@@ -83,4 +135,21 @@ export const api = {
   createJourney: (body: CreateJourneyInput) =>
     request<{ journey: Journey }>('/api/journeys', json(body)),
   deleteJourney: (id: string) => request<void>(`/api/journeys/${id}`, { method: 'DELETE' }),
+
+  trainStatus: (trainNumber: string, date: string, signal?: AbortSignal) =>
+    request<{ status: TrainStatus }>(
+      `/api/trains/${trainNumber}/status?date=${encodeURIComponent(date)}`,
+      { signal },
+    ),
+
+  simulator: () => request<SimulatorState>('/api/simulator'),
+  setScenario: (trainNumber: string, scenario: string) =>
+    request<SimulatorState>('/api/simulator/scenario', json({ trainNumber, scenario })),
+  moveClock: (action: ClockAction) => request<SimulatorState>('/api/simulator/clock', json(action)),
+  setSourceHealth: (health: SourceHealth) =>
+    request<SimulatorState>('/api/simulator/health', json({ health })),
 };
+
+/** Fired after any simulator change so live views refresh straight away. */
+export const SIMULATOR_CHANGED = 'safar:simulator-changed';
+export const notifySimulatorChanged = () => window.dispatchEvent(new Event(SIMULATOR_CHANGED));
