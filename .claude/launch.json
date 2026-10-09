@@ -3,6 +3,10 @@
   "configurations": [
     {
       "name": "safar-saathi",
+      "url": "http://localhost:5173"
+    },
+    {
+      "name": "safar-saathi-start",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
